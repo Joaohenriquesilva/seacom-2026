@@ -401,7 +401,6 @@ export default function App() {
   });
 
   const [participantPassword, setParticipantPassword] = useState('');
-  const [registrationSaving, setRegistrationSaving] = useState(false);
   const [participantPasswordConfirm, setParticipantPasswordConfirm] = useState('');
   const [showParticipantPassword, setShowParticipantPassword] = useState(false);
   const [completedRegistration, setCompletedRegistration] = useState(null);
@@ -1032,54 +1031,45 @@ export default function App() {
     return `(${digits.slice(0,2)}) ${digits.slice(2,7)}-${digits.slice(7)}`;
   };
 
-  const handleRegisterSubmit = async (e) => {
+  const handleRegisterSubmit = (e) => {
     e.preventDefault();
-    if (registrationSaving) return;
     if (!regForm.name.trim() || !regForm.email.trim() || !regForm.cpfOrId.trim() || !regForm.course.trim() || !regForm.institution.trim() || !/^\(\d{2}\) \d{5}-\d{4}$/.test(regForm.phone)) {
-      showToast('Preencha todos os campos obrigatórios e confira o telefone.', 'error');
+      showToast('Preencha nome, e-mail, matrícula/CPF, curso, instituição e telefone no formato (00) 99999-9999.', 'error');
       return;
     }
-    if (participantPassword.length < 8 || participantPassword !== participantPasswordConfirm) {
-      showToast('A senha deve ter pelo menos 8 caracteres e coincidir com a confirmação.', 'error');
+    if (participantPassword.length < 8) {
+      showToast('Crie uma senha com pelo menos 8 caracteres.', 'error');
       return;
     }
-    const selectedIds = regForm.selectedActivityIds.filter((id) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id));
-    if (!selectedIds.length || selectedIds.length !== regForm.selectedActivityIds.length) {
-      showToast('Selecione uma atividade publicada na programação.', 'error');
+    if (participantPassword !== participantPasswordConfirm) {
+      showToast('As senhas digitadas não coincidem.', 'error');
       return;
     }
-    setRegistrationSaving(true);
-    try {
-      const { supabase } = await import('./lib/supabase');
-      const email = regForm.email.trim().toLowerCase();
-      const { data: existingSession } = await supabase.auth.getSession();
-      if (existingSession?.session?.user?.email?.toLowerCase() !== email) {
-        if (existingSession?.session) await supabase.auth.signOut();
-        const { data: signup, error: signupError } = await supabase.auth.signUp({
-          email, password: participantPassword,
-          options: { data: { full_name: regForm.name.trim() } }
-        });
-        if (signupError) throw signupError;
-        if (!signup.session) {
-          throw new Error('O Supabase está exigindo confirmação por e-mail. Para testes instantâneos, desative Confirm email em Authentication > Providers > Email. Se a conta já existe, entre com e-mail e senha.');
-        }
-      }
-      const { data: protocol, error } = await supabase.rpc('seacom_register_participant', {
-        p_full_name: regForm.name.trim(), p_phone: regForm.phone,
-        p_course: regForm.course.trim(), p_institution: regForm.institution.trim(),
-        p_student_id: regForm.cpfOrId.trim(), p_activity_ids: selectedIds
-      });
-      if (error) throw error;
-      const newRegistration = { ...regForm, protocol, createdAt: new Date().toLocaleDateString('pt-BR') };
-      setCompletedRegistration(newRegistration);
-      setParticipantPassword('');
-      setParticipantPasswordConfirm('');
-      showToast(`Inscrição salva no Supabase! Protocolo: ${protocol}`);
-    } catch (err) {
-      showToast(`Não foi possível concluir a inscrição: ${err.message || 'erro desconhecido'}`, 'error');
-    } finally {
-      setRegistrationSaving(false);
+    if (regForm.selectedActivityIds.length === 0) {
+      showToast('Selecione pelo menos 1 atividade para participar.', 'error');
+      return;
     }
+
+    const randomCode = Math.floor(1000 + Math.random() * 9000);
+    const protocol = `${siteConfig.acronym}-2026-${randomCode}`;
+    const newRegistration = {
+      id: `reg-${Date.now()}`,
+      protocol,
+      ...regForm,
+      createdAt: new Date().toLocaleDateString('pt-BR')
+    };
+
+    setRegistrations((prev) => [newRegistration, ...prev]);
+    setActivities((prev) =>
+      prev.map((act) =>
+        regForm.selectedActivityIds.includes(act.id)
+          ? { ...act, enrolledCount: Math.min(act.totalSpots, act.enrolledCount + 1) }
+          : act
+      )
+    );
+
+    setCompletedRegistration(newRegistration);
+    showToast(`Inscrição confirmada! Protocolo: ${protocol}`);
   };
 
   const handleLookupRegistration = (e) => {
@@ -1828,7 +1818,7 @@ export default function App() {
                         </div>
                       </div>
                       <label className="inline-flex items-center gap-2 text-xs text-slate-700"><input type="checkbox" checked={showParticipantPassword} onChange={e=>setShowParticipantPassword(e.target.checked)}/> Mostrar senhas</label>
-                      <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-xl p-3">Teste privado: sua conta será criada no Supabase Auth e a inscrição será gravada no banco. Desative temporariamente a confirmação de e-mail no Supabase antes de testar. Não use dados pessoais reais nos testes.</p>
+                      <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-xl p-3">Atenção: o formulário de inscrição atual ainda é demonstrativo. Esta senha não cria uma conta no Supabase até a integração de autenticação dos participantes.</p>
                     </div>
 
                     <div className="space-y-4 pt-4 border-t">
@@ -1868,10 +1858,9 @@ export default function App() {
 
                     <button
                       type="submit"
-                      disabled={registrationSaving}
-                      className="w-full py-4 rounded-2xl bg-indigo-600 text-white font-extrabold text-sm shadow-lg disabled:opacity-50"
+                      className="w-full py-4 rounded-2xl bg-indigo-600 text-white font-extrabold text-sm shadow-lg"
                     >
-                      {registrationSaving ? 'Salvando inscrição...' : 'Confirmar Inscrição'}
+                      Confirmar Inscrição
                     </button>
                   </form>
                 )}

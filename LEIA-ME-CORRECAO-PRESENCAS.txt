@@ -1,0 +1,9 @@
+CORREÇÃO — INSCRITOS NA ABA QR CODE E PRESENÇAS
+
+1. No Supabase > SQL Editor, execute SQL-LISTAR-INSCRITOS-POR-ATIVIDADE.sql.
+2. Envie os arquivos atualizados para o GitHub; aguarde o deploy do Netlify.
+3. Entre como administrador, abra QR Code e presenças, escolha a palestra e clique Atualizar lista.
+4. A lista mostra inscritos e presença pendente/confirmada. A exportação Excel existente continua exportando apenas presenças confirmadas.
+
+IMPORTANTE: este pacote foi baseado no ZIP enviado nesta conversa, que é uma versão anterior ao pacote de inscrição instantânea. Se o seu GitHub já contém as alterações da inscrição instantânea, não substitua o projeto inteiro por este ZIP: copie apenas src/ModulosAdmin.tsx e o novo arquivo SQL, preservando seu App.tsx e scripts de inscrição mais recentes.
+Se não houver inscritos na lista, verifique se a inscrição foi realmente gravada em registrations e registration_activities no Supabase. O SQL não cria inscrições fictícias.
