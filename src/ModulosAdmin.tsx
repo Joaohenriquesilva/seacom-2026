@@ -32,7 +32,10 @@ export default function ModulosAdmin({isOwner,activeTab}:{isOwner:boolean,active
    const extension=file.type==='image/png'?'png':file.type==='image/webp'?'webp':'jpg';
    const path=`${kind}/${user.id}/${crypto.randomUUID()}.${extension}`;
    const {error}=await sb.storage.from('seacom-images').upload(path,file,{contentType:file.type,upsert:false});
-   if(error)throw error;
+   if(error){
+    if(/bucket not found/i.test(error.message))throw Error('O armazenamento seacom-images ainda não existe neste projeto Supabase. Execute o arquivo SQL-CORRIGIR-BUCKET-IMAGENS.sql no SQL Editor do Supabase e tente novamente.');
+    throw error;
+   }
    const {data}=sb.storage.from('seacom-images').getPublicUrl(path);
    if(kind==='news')setDraft(old=>({...old,image_url:data.publicUrl}));
    else setSite(old=>({...old,cover_url:data.publicUrl}));
