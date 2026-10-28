@@ -1,0 +1,4 @@
+Atualização: campos Criar senha e Confirmar senha no formulário público.
+Validação: mínimo de 8 caracteres, senhas iguais e opção mostrar/ocultar.
+As senhas são mantidas apenas no estado temporário do formulário e NÃO são incluídas no objeto de inscrição demonstrativa nem gravadas no banco.
+ATENÇÃO: o formulário de inscrição existente é demonstrativo e não cria contas de usuário. Para habilitar login real e QR Code por participante, é necessário integrar Supabase Auth e salvar as inscrições no banco com políticas RLS apropriadas. Não salve senhas em texto puro na tabela participants.

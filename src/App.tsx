@@ -378,6 +378,9 @@ export default function App() {
     selectedActivityIds: ['act-1']
   });
 
+  const [participantPassword, setParticipantPassword] = useState('');
+  const [participantPasswordConfirm, setParticipantPasswordConfirm] = useState('');
+  const [showParticipantPassword, setShowParticipantPassword] = useState(false);
   const [completedRegistration, setCompletedRegistration] = useState(null);
   const [lookupQuery, setLookupQuery] = useState('');
   const [lookupResult, setLookupResult] = useState(null);
@@ -1010,6 +1013,14 @@ export default function App() {
     e.preventDefault();
     if (!regForm.name.trim() || !regForm.email.trim() || !regForm.cpfOrId.trim() || !regForm.course.trim() || !regForm.institution.trim() || !/^\(\d{2}\) \d{5}-\d{4}$/.test(regForm.phone)) {
       showToast('Preencha nome, e-mail, matrícula/CPF, curso, instituição e telefone no formato (00) 99999-9999.', 'error');
+      return;
+    }
+    if (participantPassword.length < 8) {
+      showToast('Crie uma senha com pelo menos 8 caracteres.', 'error');
+      return;
+    }
+    if (participantPassword !== participantPasswordConfirm) {
+      showToast('As senhas digitadas não coincidem.', 'error');
       return;
     }
     if (regForm.selectedActivityIds.length === 0) {
@@ -1774,6 +1785,18 @@ export default function App() {
                         <div><label className="block text-xs font-bold text-slate-700 mb-1">Curso *</label><input type="text" required maxLength={120} placeholder="Ex.: Jornalismo" value={regForm.course} onChange={e=>setRegForm({...regForm,course:e.target.value})} className="w-full px-4 py-2.5 rounded-xl border text-sm"/></div>
                       </div>
                       <div><label className="block text-xs font-bold text-slate-700 mb-1">Instituição *</label><input type="text" required maxLength={150} placeholder="Ex.: Universidade Federal do Acre" value={regForm.institution} onChange={e=>setRegForm({...regForm,institution:e.target.value})} className="w-full px-4 py-2.5 rounded-xl border text-sm"/></div>
+                      <div className="grid sm:grid-cols-2 gap-4">
+                        <div>
+                          <label htmlFor="participant-password" className="block text-xs font-bold text-slate-700 mb-1">Criar senha *</label>
+                          <input id="participant-password" type={showParticipantPassword ? 'text' : 'password'} required minLength={8} autoComplete="new-password" placeholder="Mínimo de 8 caracteres" value={participantPassword} onChange={e=>setParticipantPassword(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border text-sm"/>
+                        </div>
+                        <div>
+                          <label htmlFor="participant-password-confirm" className="block text-xs font-bold text-slate-700 mb-1">Confirmar senha *</label>
+                          <input id="participant-password-confirm" type={showParticipantPassword ? 'text' : 'password'} required minLength={8} autoComplete="new-password" placeholder="Repita a senha" value={participantPasswordConfirm} onChange={e=>setParticipantPasswordConfirm(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border text-sm"/>
+                        </div>
+                      </div>
+                      <label className="inline-flex items-center gap-2 text-xs text-slate-700"><input type="checkbox" checked={showParticipantPassword} onChange={e=>setShowParticipantPassword(e.target.checked)}/> Mostrar senhas</label>
+                      <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-xl p-3">Atenção: o formulário de inscrição atual ainda é demonstrativo. Esta senha não cria uma conta no Supabase até a integração de autenticação dos participantes.</p>
                     </div>
 
                     <div className="space-y-4 pt-4 border-t">
