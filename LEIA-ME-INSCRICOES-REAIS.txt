@@ -1,0 +1,16 @@
+SEACOM 2026 — INSCRIÇÕES REAIS EM TESTE PRIVADO
+
+1. Execute SQL-INSCRICOES-REAIS-SEM-CONFIRMACAO.sql no SQL Editor do Supabase.
+2. Supabase > Authentication > Providers > Email: desative temporariamente Confirm email.
+3. Faça commit dos arquivos atualizados no GitHub e aguarde o deploy no Netlify.
+4. Abra janela anônima, selecione uma atividade REAL publicada e cadastre e-mail novo e senha.
+5. Confira no Supabase: Authentication > Users; Table Editor > participants, registrations, registration_activities.
+6. Na aba QR Code e Presenças, selecione a atividade e clique Atualizar lista.
+
+AVISOS:
+- Não utilize dados pessoais reais durante os testes.
+- Contas que já existem no Auth não podem ser cadastradas novamente por este formulário. Use outro e-mail de teste.
+- Se o cadastro Auth ocorrer mas a gravação RPC falhar, a conta pode ter sido criada sem inscrição.
+- A senha é gerenciada exclusivamente pelo Supabase Auth, nunca gravada em participants.
+- Antes de abrir ao público: reative a confirmação de e-mail, configure SMTP e revise capacidade/vagas,
+  recuperação de senha, consentimento LGPD e fluxo de inscrições para contas existentes.

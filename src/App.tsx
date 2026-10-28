@@ -1055,9 +1055,26 @@ export default function App() {
       const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
       const client = createClient(url, key, {auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false}});
       const email = regForm.email.trim().toLowerCase();
+      // Reaproveita contas criadas em tentativas anteriores: o Auth pode ter
+      // cadastrado o usuário mesmo quando a gravação da inscrição falhou.
+      let authSession = null;
       const {data:signup,error:signupError} = await client.auth.signUp({email,password:participantPassword});
-      if (signupError) throw signupError;
-      if (!signup.session) throw new Error('A confirmação de e-mail ainda está ativada no Supabase. Para o teste instantâneo, desative Confirm email em Authentication → Providers → Email.');
+      if (!signupError && signup?.session) {
+        authSession = signup.session;
+      } else {
+        // Não trate uma conta existente como nova nem mostre sucesso sem RPC.
+        // Em projetos com confirmação de e-mail ativa, signUp pode retornar
+        // um usuário sem sessão. O login esclarece se já existe uma conta.
+        const {data:login,error:loginError} = await client.auth.signInWithPassword({email,password:participantPassword});
+        if (loginError || !login?.session) {
+          if (signupError && !/already registered|already exists|already been registered/i.test(signupError.message || '')) {
+            throw signupError;
+          }
+          throw new Error('Este e-mail já possui uma conta, ou precisa ser confirmado. Para concluir a inscrição, informe a senha usada no primeiro cadastro. Se não souber a senha, solicite a redefinição antes de tentar novamente.');
+        }
+        authSession = login.session;
+      }
+      if (!authSession) throw new Error('Não foi possível autenticar o participante. Verifique as configurações de confirmação de e-mail do Supabase.');
       const {data,error} = await client.rpc('seacom_register_participant',{
         p_activity_ids:regForm.selectedActivityIds,
         p_course:regForm.course.trim(),
@@ -1072,7 +1089,7 @@ export default function App() {
       if (!protocol) throw new Error('O banco não retornou o protocolo da inscrição. Verifique a função SQL.');
       setCompletedRegistration({...regForm,protocol});
       setParticipantPassword(''); setParticipantPasswordConfirm('');
-      showToast('Inscrição gravada no Supabase! Protocolo: '+protocol);
+      showToast('Inscrição confirmada e salva! Sua presença na palestra será registrada separadamente pelo QR Code. Protocolo: '+protocol);
       window.dispatchEvent(new Event('seacom:content-updated'));
     } catch (err) {
       const msg = err?.message || 'Erro desconhecido';
@@ -1826,7 +1843,7 @@ export default function App() {
                         </div>
                       </div>
                       <label className="inline-flex items-center gap-2 text-xs text-slate-700"><input type="checkbox" checked={showParticipantPassword} onChange={e=>setShowParticipantPassword(e.target.checked)}/> Mostrar senhas</label>
-                      <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-xl p-3">Inscrição de teste real: a conta e a inscrição serão gravadas no Supabase. A confirmação por e-mail deve estar temporariamente desativada. Não utilize dados pessoais reais nos testes.</p>
+                      <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-xl p-3">Ao clicar em Confirmar Inscrição, seu cadastro e sua vaga na atividade serão registrados imediatamente. O QR Code é utilizado depois, somente para registrar presença. A confirmação por e-mail está desativada durante os testes privados.</p>
                     </div>
 
                     <div className="space-y-4 pt-4 border-t">

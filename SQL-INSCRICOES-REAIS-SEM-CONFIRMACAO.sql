@@ -34,7 +34,7 @@ BEGIN
      length(trim(coalesce(p_course,''))) = 0 OR
      length(trim(coalesce(p_institution,''))) = 0 OR
      length(trim(coalesce(p_student_id,''))) = 0 OR
-     coalesce(p_phone,'') !~ '^\\([0-9]{2}\\) [0-9]{5}-[0-9]{4}$' THEN
+     coalesce(p_phone,'') !~ '^\([0-9]{2}\) [0-9]{5}-[0-9]{4}$' THEN
     RAISE EXCEPTION 'Dados de inscrição incompletos ou telefone inválido';
   END IF;
   IF p_activity_ids IS NULL OR cardinality(p_activity_ids) = 0 THEN
@@ -69,6 +69,11 @@ BEGIN
     VALUES(v_participant,'confirmed')
     RETURNING id,protocol INTO v_registration,v_protocol;
   END IF;
+  -- Confirmar a inscrição no clique do formulário, independentemente do check-in.
+  UPDATE public.registrations
+  SET status = 'confirmed'
+  WHERE id = v_registration AND status <> 'confirmed';
+
   FOREACH v_activity IN ARRAY p_activity_ids LOOP
     INSERT INTO public.registration_activities(registration_id,activity_id)
     VALUES(v_registration,v_activity)

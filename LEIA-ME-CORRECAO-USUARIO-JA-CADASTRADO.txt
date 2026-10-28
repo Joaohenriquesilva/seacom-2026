@@ -1,0 +1,28 @@
+SEACOM 2026 — CORREÇÃO "USER ALREADY REGISTERED"
+
+CAUSA: A tentativa anterior criou a conta no Supabase Auth, mas não concluiu
+a gravação em participants / registrations / registration_activities.
+
+O QUE MUDOU:
+- O formulário tenta cadastrar um e-mail novo.
+- Se a conta já existe, tenta autenticar com a senha digitada e continuar a inscrição.
+- A confirmação só aparece depois que a função SQL retorna um protocolo.
+- Corrigida a expressão regular de telefone no SQL de inscrição.
+
+INSTALAÇÃO:
+1. Execute SQL-INSCRICOES-REAIS-SEM-CONFIRMACAO.sql no Supabase SQL Editor.
+2. Atualize os arquivos no GitHub e aguarde o deploy do Netlify.
+3. Em Authentication > Providers > Email, mantenha Confirm email desativado SOMENTE nos testes privados.
+4. Tente inscrever-se com o mesmo e-mail E A MESMA SENHA da tentativa anterior.
+5. Verifique Authentication > Users e a aba QR Code e Presenças > Atualizar lista.
+
+Se não lembrar a senha, não crie outra conta para o mesmo e-mail: será preciso
+recuperar ou redefinir a senha no Supabase.
+
+DIAGNÓSTICO (SQL Editor):
+SELECT COUNT(*) AS participantes FROM public.participants;
+SELECT COUNT(*) AS inscricoes FROM public.registrations;
+SELECT COUNT(*) AS atividades_inscritas FROM public.registration_activities;
+
+NOTA: a lista de presenças só mostra inscrições vinculadas à palestra
+selecionada. Não confunda conta no Auth com inscrição efetivamente gravada.
