@@ -1,0 +1,11 @@
+SEACOM 2026 — Navegação e atualização de conteúdo
+
+1. A navegação pública usa endereços com #/home, #/schedule, #/news, #/register e #/admin.
+2. Os botões do menu trocam a seção sem recarregar o documento HTML inteiro.
+3. Ao salvar notícias, programação ou página inicial no painel, os dados públicos são consultados novamente ao Supabase na sessão aberta.
+4. Os botões voltar/avançar do navegador atualizam a seção exibida.
+5. Se o visitante apertar F5, o navegador ainda recarrega o aplicativo (comportamento normal da web), mas ele permanece na mesma seção graças à URL.
+6. Alterações feitas em OUTRO navegador/dispositivo não são transmitidas em tempo real nesta versão. O conteúdo é atualizado ao navegar entre as seções; para atualização em tempo real entre dispositivos, configurar Supabase Realtime.
+7. Não é necessário executar SQL. Publique os arquivos no GitHub e aguarde o deploy no Netlify.
+
+Verificação: navegue para Notícias e use F5, volte e avance pelo histórico; no painel, publique uma notícia e visite a aba Notícias sem recarregar.

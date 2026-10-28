@@ -255,7 +255,29 @@ const INITIAL_REGISTRATIONS = [
 // ============================================================================
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState(() => new URLSearchParams(window.location.search).get('admin') === 'login' ? 'admin' : 'home');
+  const validPages = ['home', 'schedule', 'news', 'register', 'admin'];
+  const getPageFromUrl = () => {
+    const hash = window.location.hash.replace(/^#\/?/, '');
+    if (validPages.includes(hash)) return hash;
+    return new URLSearchParams(window.location.search).get('admin') === 'login' ? 'admin' : 'home';
+  };
+  const [activeTab, setActiveTabState] = useState(getPageFromUrl);
+  const [contentRevision, setContentRevision] = useState(0);
+  const setActiveTab = (page) => {
+    if (!validPages.includes(page)) return;
+    window.history.pushState({page}, '', `${window.location.pathname}${window.location.search}#/${page}`);
+    setActiveTabState(page);
+    setContentRevision(v => v + 1);
+    window.scrollTo({top: 0, behavior: 'instant'});
+  };
+  useEffect(() => {
+    const onHistory = () => { setActiveTabState(getPageFromUrl()); setContentRevision(v => v + 1); };
+    const onUpdated = () => setContentRevision(v => v + 1);
+    window.addEventListener('popstate', onHistory);
+    window.addEventListener('hashchange', onHistory);
+    window.addEventListener('seacom:content-updated', onUpdated);
+    return () => { window.removeEventListener('popstate', onHistory); window.removeEventListener('hashchange', onHistory); window.removeEventListener('seacom:content-updated', onUpdated); };
+  }, []);
 
   const [siteConfig, setSiteConfig] = useState(INITIAL_SITE_CONFIG);
   const [activities, setActivities] = useState(INITIAL_ACTIVITIES);
@@ -325,7 +347,7 @@ export default function App() {
     }
     carregarProgramacao();
     return () => { ativo = false; };
-  }, []);
+  }, [contentRevision, activeTab]);
 
   const [homeSections, setHomeSections] = useState([{id:'hero',type:'hero',visible:true},{id:'about',type:'about',visible:true}]);
   const [newsList, setNewsList] = useState(INITIAL_NEWS);
@@ -340,11 +362,11 @@ export default function App() {
           supabase.from('seacom_news').select('*').eq('published',true).order('created_at',{ascending:false})
         ]);
         if (!alive) return;
-        if (site.data) { setSiteConfig(prev => ({...prev, heroBadge:site.data.hero_badge,heroTitle:site.data.hero_title,heroSubtitle:site.data.hero_subtitle,aboutText:site.data.about_text,coverUrl:site.data.cover_url})); if(Array.isArray(site.data.home_sections)) setHomeSections(site.data.home_sections); }
+        if (site.data) { setSiteConfig(prev => ({...prev, heroBadge:site.data.hero_badge,heroTitle:site.data.hero_title,heroSubtitle:site.data.hero_subtitle,aboutText:site.data.about_text,coverUrl:site.data.cover_url})); if(Array.isArray(site.data.home_sections) && site.data.home_sections.length) setHomeSections(site.data.home_sections); }
         if (!news.error) setNewsList((news.data||[]).map(n => ({id:n.id,title:n.title,summary:n.summary,content:n.body,imageUrl:n.image_url||'https://placehold.co/600x450/1e1b4b/ffffff?text=SEACOM',category:'Notícia',date:new Date(n.created_at).toLocaleDateString('pt-BR')})));
       } catch(e) { console.warn('Conteúdo público indisponível:',e); }
     })(); return () => { alive = false; };
-  }, []);
+  }, [contentRevision, activeTab]);
 
   const [admins, setAdmins] = useState(INITIAL_ADMINS);
   const [registrations, setRegistrations] = useState(INITIAL_REGISTRATIONS);
