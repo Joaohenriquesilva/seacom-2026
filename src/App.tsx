@@ -1057,7 +1057,7 @@ export default function App() {
       showToast('Selecione ao menos uma atividade.', 'error'); return;
     }
     if (regForm.selectedActivityIds.some(id => !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id))) {
-      showToast('A programação ainda não foi carregada do Supabase. Atualize e selecione uma atividade publicada.', 'error'); return;
+      showToast('A programação ainda não foi carregada. Atualize e selecione uma atividade publicada.', 'error'); return;
     }
     setRegistrationBusy(true);
     try {
@@ -1086,7 +1086,7 @@ export default function App() {
         }
         authSession = login.session;
       }
-      if (!authSession) throw new Error('Não foi possível autenticar o participante. Verifique as configurações de confirmação de e-mail do Supabase.');
+      if (!authSession) throw new Error('Não foi possível autenticar o participante. Verifique se sua conta está ativa.');
       const {data,error} = await client.rpc('seacom_register_participant',{
         p_activity_ids:regForm.selectedActivityIds,
         p_course:regForm.course.trim(),
@@ -1575,10 +1575,10 @@ export default function App() {
               </span>
               <h1 className="text-2xl sm:text-4xl font-extrabold mt-3">Programação de Painéis e Mesas Redondas</h1>
               <p className="mt-3 text-sm text-indigo-100" role="status">
-                {programacaoStatus === 'carregando' && 'Verificando programação do Supabase...'}
-                {programacaoStatus === 'sem-configuracao' && `Supabase não configurado: ${programacaoErro} Exibindo programação demonstrativa.`}
-                {programacaoStatus === 'conectado' && (activities.length ? 'Programação publicada no Supabase.' : 'Nenhuma atividade publicada no momento.')}
-                {programacaoStatus === 'erro' && `Não foi possível consultar o Supabase: ${programacaoErro}. Exibindo dados demonstrativos.`}
+                {programacaoStatus === 'carregando' && 'Carregando programação...'}
+                {programacaoStatus === 'sem-configuracao' && `Programação indisponível no momento.`}
+                {programacaoStatus === 'conectado' && (activities.length ? 'Programação atualizada.' : 'Nenhuma atividade publicada no momento.')}
+                {programacaoStatus === 'erro' && `Não foi possível carregar a programação. Tente novamente mais tarde.`}
               </p>
               <div className="mt-6 flex flex-wrap gap-2.5">
                 <button

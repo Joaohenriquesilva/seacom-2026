@@ -1,12 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { createClient } from '@supabase/supabase-js';
+import { supabase } from './lib/supabase';
 
 /** Tela exclusiva para o retorno de convites do Supabase Auth. */
 export default function DefinirSenhaConvite() {
   const [client] = useState(() => {
     const url = import.meta.env.VITE_SUPABASE_URL;
     const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-    return url && key ? createClient(url, key, { auth: { detectSessionInUrl: true } }) : null;
+    return url && key ? supabase : null;
   });
   const [ready, setReady] = useState(false);
   const [valid, setValid] = useState(false);
@@ -16,7 +16,7 @@ export default function DefinirSenhaConvite() {
   const [message, setMessage] = useState('');
 
   useEffect(() => {
-    if (!client) { setMessage('Configuração do Supabase ausente. Confira o arquivo .env.local.'); setReady(true); return; }
+    if (!client) { setMessage('Serviço de autenticação indisponível. Contate a organização.'); setReady(true); return; }
     let alive = true;
     // O SDK processa os tokens do link (hash ou code) e cria a sessão do convidado.
     const { data: { subscription } } = client.auth.onAuthStateChange((_event, session) => {

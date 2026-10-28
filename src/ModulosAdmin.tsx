@@ -2,9 +2,9 @@ import React,{useEffect,useState} from 'react';
 import EditorNoticia from './EditorNoticia';
 import ProgramacaoAdmin from './ProgramacaoAdmin';
 import {newsPlainText} from './lib/newsRichText';
-import {createClient} from '@supabase/supabase-js';
+import {supabase} from './lib/supabase';
 const url=import.meta.env.VITE_SUPABASE_URL,key=import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-const sb=url&&key?createClient(url,key):null;
+const sb=url&&key?supabase:null;
 type News={id:string,title:string,summary:string,body:string,image_url:string|null,published:boolean};
 type HomeSection={id:string,type:'hero'|'about'|'text'|'schedule'|'news'|'register',visible:boolean,title?:string,body?:string};
 type Site={hero_badge:string,hero_title:string,hero_subtitle:string,cover_url:string,about_text:string,home_sections:HomeSection[],favicon_url?:string,header_logo_url?:string,header_name?:string,header_subtitle?:string,header_edition?:string,header_show_edition?:boolean,header_logo_size?:number};
@@ -22,7 +22,7 @@ export default function ModulosAdmin({isOwner,activeTab}:{isOwner:boolean,active
   const results=await Promise.all(permissions.map(async p=>{const {data}=await sb.rpc('seacom_can',{p_permission:p});return [p,!!data] as const}));
   setRights(Object.fromEntries(results));
   const [n,s,a]=await Promise.all([sb.from('seacom_news').select('*').order('created_at',{ascending:false}),sb.from('seacom_site_content').select('*').eq('id',1).single(),sb.from('activities').select('id,title,starts_at').eq('is_published',true).order('starts_at')]);
-  if(n.error)setMessage('Execute SQL-MODULOS-CONTEUDO-PRESENCA.sql: '+n.error.message);else setNews(n.data||[]);
+  if(n.error)setMessage('Não foi possível carregar as notícias: '+n.error.message);else setNews(n.data||[]);
   if(s.data)setSite({...s.data,home_sections:Array.isArray(s.data.home_sections)?s.data.home_sections:defaultSections,favicon_url:s.data.favicon_url||'',header_logo_url:s.data.header_logo_url||'',header_name:s.data.header_name??'SEACOM',header_subtitle:s.data.header_subtitle??'Semana Acadêmica de Comunicação',header_edition:s.data.header_edition??'XIII EDIÇÃO • 2026',header_show_edition:s.data.header_show_edition!==false,header_logo_size:s.data.header_logo_size??44,header_logo_url:'',header_name:'SEACOM',header_subtitle:'Semana Acadêmica de Comunicação',header_edition:'XIII EDIÇÃO • 2026',header_show_edition:true,header_logo_size:44});if(a.data){setActivities(a.data);if(a.data.length)setActivity(a.data[0].id)}
  })()},[]);
  async function uploadImage(file:File,kind:'news'|'cover'|'favicon'|'logo'){
@@ -37,7 +37,7 @@ export default function ModulosAdmin({isOwner,activeTab}:{isOwner:boolean,active
    const path=`${kind}/${user.id}/${crypto.randomUUID()}.${extension}`;
    const {error}=await sb.storage.from('seacom-images').upload(path,file,{contentType:file.type,upsert:false});
    if(error){
-    if(/bucket not found/i.test(error.message))throw Error('O armazenamento seacom-images ainda não existe neste projeto Supabase. Execute o arquivo SQL-CORRIGIR-BUCKET-IMAGENS.sql no SQL Editor do Supabase e tente novamente.');
+    if(/bucket not found/i.test(error.message))throw Error('O armazenamento de imagens ainda não está configurado. Contate a administração.');
     throw error;
    }
    const {data}=sb.storage.from('seacom-images').getPublicUrl(path);
@@ -49,7 +49,7 @@ export default function ModulosAdmin({isOwner,activeTab}:{isOwner:boolean,active
   }catch(e:any){setMessage('Falha no envio da imagem: '+(e?.message||String(e)))}finally{setUploading(null)}
  }
  async function uploadInlineNewsImage(file:File):Promise<string>{
-  if(!sb)throw Error('Supabase indisponível.');
+  if(!sb)throw Error('Serviço temporariamente indisponível.');
   if(!['image/jpeg','image/png','image/webp'].includes(file.type))throw Error('Use JPG, PNG ou WebP.');
   if(file.size>5*1024*1024)throw Error('Cada imagem deve ter até 5 MB.');
   const {data:{user},error:authError}=await sb.auth.getUser();if(authError||!user)throw Error('Entre novamente na área administrativa.');
@@ -64,7 +64,7 @@ export default function ModulosAdmin({isOwner,activeTab}:{isOwner:boolean,active
   const payload={title:draft.title.trim(),summary:draft.summary,body:draft.body,image_url:draft.image_url||null,published:draft.published};
   const result=draft.id?await sb.from('seacom_news').update({...payload,updated_at:new Date().toISOString()}).eq('id',draft.id):await sb.from('seacom_news').insert({...payload,created_by:user.id});
   if(result.error)throw result.error;
-  const {data,error}=await sb.from('seacom_news').select('*').order('created_at',{ascending:false});if(error)throw error;setNews(data||[]);setDraft(blank);setMessage('Notícia salva no Supabase.');window.dispatchEvent(new Event('seacom:content-updated'));
+  const {data,error}=await sb.from('seacom_news').select('*').order('created_at',{ascending:false});if(error)throw error;setNews(data||[]);setDraft(blank);setMessage('Notícia salva com sucesso.');window.dispatchEvent(new Event('seacom:content-updated'));
  }catch(e:any){setMessage(e.message)}finally{setBusy(false)}}
  async function removeNews(id:string){if(!sb||!window.confirm('Excluir definitivamente esta notícia?'))return;const {error}=await sb.from('seacom_news').delete().eq('id',id);if(error)setMessage(error.message);else{setNews(x=>x.filter(n=>n.id!==id));setMessage('Notícia excluída.');window.dispatchEvent(new Event('seacom:content-updated'))}}
  function changeSections(next:HomeSection[]){setSite(old=>({...old,home_sections:next}));setSectionNotice('Alterações pendentes. Clique em Salvar alterações da página inicial.');}
@@ -101,7 +101,7 @@ export default function ModulosAdmin({isOwner,activeTab}:{isOwner:boolean,active
  {activeTab==='attendance'&&(isOwner||rights['inscricoes.exportar']||rights['credenciamento.visualizar'])&&<section className="space-y-3"><h3 className="text-lg font-semibold">QR Code e lista de presença</h3><p className="text-sm text-slate-600">O QR Code abre a confirmação autenticada. Somente participantes com inscrição confirmada e conta Auth com o mesmo e-mail poderão registrar presença, próximo ao horário da atividade.</p><select className={input} value={activity} onChange={e=>{setActivity(e.target.value);setQr('');setEnrollments([])}}>{activities.map(a=><option key={a.id} value={a.id}>{a.title}</option>)}</select><div className="flex flex-wrap gap-2"><button type="button" className={btn} onClick={makeQR}>Gerar QR Code</button>{(isOwner||rights['inscricoes.exportar'])&&<button type="button" className={btn} disabled={busy} onClick={exportExcel}>Exportar presenças (.xlsx)</button>}</div>{qr&&<div className="space-y-2"><img src={qr} alt="QR Code da atividade selecionada" className="w-64 h-64"/><a href={qr} download={`seacom-qr-${activity}.png`} className="underline text-indigo-700">Baixar QR Code PNG</a></div>}
  <div className="border rounded-xl p-4 space-y-3"><div className="flex flex-wrap justify-between items-center gap-2"><h4 className="font-bold">Participantes inscritos nesta atividade ({enrollments.length})</h4><button type="button" className="border rounded-lg px-3 py-2 disabled:opacity-50" onClick={loadEnrollments} disabled={enrollLoading}>{enrollLoading?'Atualizando...':'Atualizar lista'}</button></div>
  <p className="text-sm text-slate-600">Inscrição e presença são etapas diferentes. A presença só fica confirmada depois que o participante usa o QR Code no horário permitido.</p>
- {enrollError&&<p role="alert" className="text-red-700 text-sm">Não foi possível consultar inscritos: {enrollError}. Execute SQL-LISTAR-INSCRITOS-POR-ATIVIDADE.sql no Supabase.</p>}
+ {enrollError&&<p role="alert" className="text-red-700 text-sm">Não foi possível consultar inscritos: {enrollError}.</p>}
  {!enrollLoading&&!enrollError&&enrollments.length===0&&<p className="text-sm text-slate-500">Nenhuma inscrição encontrada para esta atividade.</p>}
  {enrollments.length>0&&<div className="overflow-x-auto"><table className="w-full text-sm text-left"><thead><tr className="border-b"><th className="p-2">Nome</th><th className="p-2">E-mail</th><th className="p-2">Inscrição</th><th className="p-2">Presença</th></tr></thead><tbody>{enrollments.map((r:any)=><tr key={r.registration_id} className="border-b"><td className="p-2">{r.nome}</td><td className="p-2">{r.email}</td><td className="p-2">{r.status_inscricao}</td><td className="p-2">{r.confirmado_em?'Confirmada':'Pendente'}</td></tr>)}</tbody></table></div>}</div></section>}
  {['news','home','attendance'].includes(activeTab)&&!isOwner&&((activeTab==='news'&&!rights['noticias.visualizar']&&!rights['noticias.criar']&&!rights['noticias.editar'])||(activeTab==='home'&&!rights['site.editar'])||(activeTab==='attendance'&&!rights['inscricoes.exportar']&&!rights['credenciamento.visualizar']))&&<p className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">Você não tem permissão para acessar esta seção. Solicite acesso à administração principal.</p>}
