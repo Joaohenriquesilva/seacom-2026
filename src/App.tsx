@@ -404,6 +404,7 @@ export default function App() {
   const [participantPasswordConfirm, setParticipantPasswordConfirm] = useState('');
   const [showParticipantPassword, setShowParticipantPassword] = useState(false);
   const [completedRegistration, setCompletedRegistration] = useState(null);
+  const [registrationBusy, setRegistrationBusy] = useState(false);
   const [lookupQuery, setLookupQuery] = useState('');
   const [lookupResult, setLookupResult] = useState(null);
   const [lookupAttempted, setLookupAttempted] = useState(false);
@@ -1031,45 +1032,52 @@ export default function App() {
     return `(${digits.slice(0,2)}) ${digits.slice(2,7)}-${digits.slice(7)}`;
   };
 
-  const handleRegisterSubmit = (e) => {
+  const handleRegisterSubmit = async (e) => {
     e.preventDefault();
+    if (registrationBusy) return;
     if (!regForm.name.trim() || !regForm.email.trim() || !regForm.cpfOrId.trim() || !regForm.course.trim() || !regForm.institution.trim() || !/^\(\d{2}\) \d{5}-\d{4}$/.test(regForm.phone)) {
-      showToast('Preencha nome, e-mail, matrícula/CPF, curso, instituição e telefone no formato (00) 99999-9999.', 'error');
-      return;
+      showToast('Preencha todos os dados e o telefone no formato (00) 99999-9999.', 'error'); return;
     }
-    if (participantPassword.length < 8) {
-      showToast('Crie uma senha com pelo menos 8 caracteres.', 'error');
-      return;
+    if (participantPassword.length < 8 || participantPassword !== participantPasswordConfirm) {
+      showToast('A senha deve ter ao menos 8 caracteres e coincidir com a confirmação.', 'error'); return;
     }
-    if (participantPassword !== participantPasswordConfirm) {
-      showToast('As senhas digitadas não coincidem.', 'error');
-      return;
+    if (!regForm.selectedActivityIds.length) {
+      showToast('Selecione ao menos uma atividade.', 'error'); return;
     }
-    if (regForm.selectedActivityIds.length === 0) {
-      showToast('Selecione pelo menos 1 atividade para participar.', 'error');
-      return;
+    if (regForm.selectedActivityIds.some(id => !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id))) {
+      showToast('A programação ainda não foi carregada do Supabase. Atualize e selecione uma atividade publicada.', 'error'); return;
     }
-
-    const randomCode = Math.floor(1000 + Math.random() * 9000);
-    const protocol = `${siteConfig.acronym}-2026-${randomCode}`;
-    const newRegistration = {
-      id: `reg-${Date.now()}`,
-      protocol,
-      ...regForm,
-      createdAt: new Date().toLocaleDateString('pt-BR')
-    };
-
-    setRegistrations((prev) => [newRegistration, ...prev]);
-    setActivities((prev) =>
-      prev.map((act) =>
-        regForm.selectedActivityIds.includes(act.id)
-          ? { ...act, enrolledCount: Math.min(act.totalSpots, act.enrolledCount + 1) }
-          : act
-      )
-    );
-
-    setCompletedRegistration(newRegistration);
-    showToast(`Inscrição confirmada! Protocolo: ${protocol}`);
+    setRegistrationBusy(true);
+    try {
+      // Cliente separado: não substitui a sessão de um organizador que esteja testando o site.
+      const { createClient } = await import('@supabase/supabase-js');
+      const url = import.meta.env.VITE_SUPABASE_URL;
+      const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+      const client = createClient(url, key, {auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false}});
+      const email = regForm.email.trim().toLowerCase();
+      const {data:signup,error:signupError} = await client.auth.signUp({email,password:participantPassword});
+      if (signupError) throw signupError;
+      if (!signup.session) throw new Error('A confirmação de e-mail ainda está ativada no Supabase. Para o teste instantâneo, desative Confirm email em Authentication → Providers → Email.');
+      const {data,error} = await client.rpc('seacom_register_participant',{
+        p_activity_ids:regForm.selectedActivityIds,
+        p_course:regForm.course.trim(),
+        p_full_name:regForm.name.trim(),
+        p_institution:regForm.institution.trim(),
+        p_phone:regForm.phone,
+        p_student_id:regForm.cpfOrId.trim()
+      });
+      if (error) throw error;
+      const result = Array.isArray(data) ? data[0] : data;
+      const protocol = typeof result === 'string' ? result : result?.protocol;
+      if (!protocol) throw new Error('O banco não retornou o protocolo da inscrição. Verifique a função SQL.');
+      setCompletedRegistration({...regForm,protocol});
+      setParticipantPassword(''); setParticipantPasswordConfirm('');
+      showToast('Inscrição gravada no Supabase! Protocolo: '+protocol);
+      window.dispatchEvent(new Event('seacom:content-updated'));
+    } catch (err) {
+      const msg = err?.message || 'Erro desconhecido';
+      showToast('Não foi possível concluir a inscrição: '+msg, 'error');
+    } finally { setRegistrationBusy(false); }
   };
 
   const handleLookupRegistration = (e) => {
@@ -1818,7 +1826,7 @@ export default function App() {
                         </div>
                       </div>
                       <label className="inline-flex items-center gap-2 text-xs text-slate-700"><input type="checkbox" checked={showParticipantPassword} onChange={e=>setShowParticipantPassword(e.target.checked)}/> Mostrar senhas</label>
-                      <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-xl p-3">Atenção: o formulário de inscrição atual ainda é demonstrativo. Esta senha não cria uma conta no Supabase até a integração de autenticação dos participantes.</p>
+                      <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-xl p-3">Inscrição de teste real: a conta e a inscrição serão gravadas no Supabase. A confirmação por e-mail deve estar temporariamente desativada. Não utilize dados pessoais reais nos testes.</p>
                     </div>
 
                     <div className="space-y-4 pt-4 border-t">
@@ -1858,9 +1866,10 @@ export default function App() {
 
                     <button
                       type="submit"
-                      className="w-full py-4 rounded-2xl bg-indigo-600 text-white font-extrabold text-sm shadow-lg"
+                      disabled={registrationBusy}
+                      className="w-full py-4 rounded-2xl bg-indigo-600 text-white font-extrabold text-sm shadow-lg disabled:opacity-60"
                     >
-                      Confirmar Inscrição
+                      {registrationBusy ? "Salvando inscrição..." : "Confirmar Inscrição"}
                     </button>
                   </form>
                 )}
