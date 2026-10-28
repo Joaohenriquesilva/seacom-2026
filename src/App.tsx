@@ -374,7 +374,7 @@ export default function App() {
           const icon = document.querySelector('link[rel=\"icon\"]') || document.createElement('link');
           icon.setAttribute('rel','icon'); icon.setAttribute('href',site.data.favicon_url || '/favicon.svg');
           if (!icon.parentNode) document.head.appendChild(icon);
-          setSiteConfig(prev => ({...prev, heroBadge:site.data.hero_badge,heroTitle:site.data.hero_title,heroSubtitle:site.data.hero_subtitle,aboutText:site.data.about_text,coverUrl:site.data.cover_url})); if(Array.isArray(site.data.home_sections) && site.data.home_sections.length) setHomeSections(site.data.home_sections); }
+          setSiteConfig(prev => ({...prev, heroBadge:site.data.hero_badge,heroTitle:site.data.hero_title,heroSubtitle:site.data.hero_subtitle,aboutText:site.data.about_text,coverUrl:site.data.cover_url,acronym:site.data.header_name??prev.acronym,fullName:site.data.header_subtitle??prev.fullName,edition:site.data.header_edition??prev.edition,headerLogoUrl:site.data.header_logo_url||'',headerLogoSize:site.data.header_logo_size??44,headerShowEdition:site.data.header_show_edition!==false})); if(Array.isArray(site.data.home_sections) && site.data.home_sections.length) setHomeSections(site.data.home_sections); }
         if (!news.error) setNewsList((news.data||[]).map(n => ({id:n.id,title:n.title,summary:n.summary,content:n.body,imageUrl:n.image_url||'https://placehold.co/600x450/1e1b4b/ffffff?text=SEACOM',category:'Notícia',date:new Date(n.created_at).toLocaleDateString('pt-BR')})));
       } catch(e) { console.warn('Conteúdo público indisponível:',e); }
     })(); return () => { alive = false; };
@@ -1414,15 +1414,15 @@ export default function App() {
             onClick={() => setActiveTab('home')}
             className="flex items-center gap-3 text-left group focus:outline-none"
           >
-            <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-indigo-600 via-indigo-700 to-violet-700 flex items-center justify-center text-white shadow-md shadow-indigo-500/20 group-hover:scale-105 transition">
-              <Radio className="w-6 h-6" />
+            <div className="rounded-2xl bg-gradient-to-br from-indigo-600 via-indigo-700 to-violet-700 flex items-center justify-center text-white shadow-md shadow-indigo-500/20 group-hover:scale-105 transition shrink-0 overflow-hidden" style={{width:siteConfig.headerLogoSize||44,height:siteConfig.headerLogoSize||44}}>
+              {siteConfig.headerLogoUrl ? <img src={siteConfig.headerLogoUrl} alt="Logomarca do evento" className="w-full h-full object-contain" /> : <Radio className="w-6 h-6" />}
             </div>
             <div>
               <div className="flex items-center gap-2">
                 <span className="text-xl font-extrabold tracking-tight text-slate-900">
                   {siteConfig.acronym}
                 </span>
-                <span className="hidden sm:inline-block text-[11px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200/60">
+                <span className={`${siteConfig.headerShowEdition === false ? 'hidden' : 'hidden sm:inline-block'} text-[11px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200/60`}>
                   {siteConfig.edition}
                 </span>
               </div>
