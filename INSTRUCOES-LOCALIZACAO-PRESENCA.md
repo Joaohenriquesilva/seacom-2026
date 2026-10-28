@@ -6,7 +6,7 @@
 
 ```sql
 UPDATE public.seacom_checkin_location
-SET latitude = -9.9594°, longitude = -67.8711°, radius_m = 250
+SET latitude = SUA_LATITUDE, longitude = SUA_LONGITUDE, radius_m = 250
 WHERE id = 1;
 ```
 
