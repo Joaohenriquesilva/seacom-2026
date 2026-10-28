@@ -255,23 +255,31 @@ const INITIAL_REGISTRATIONS = [
 // ============================================================================
 
 export default function App() {
-  const validPages = ['home', 'schedule', 'news', 'register', 'admin'];
+  const validPages = ['home', 'schedule', 'news', 'register', 'admin', 'article'];
   const getPageFromUrl = () => {
     const hash = window.location.hash.replace(/^#\/?/, '');
+    if (hash.startsWith('article/')) return 'article';
     if (validPages.includes(hash)) return hash;
     return new URLSearchParams(window.location.search).get('admin') === 'login' ? 'admin' : 'home';
   };
   const [activeTab, setActiveTabState] = useState(getPageFromUrl);
   const [contentRevision, setContentRevision] = useState(0);
+  const [articleId, setArticleId] = useState(() => decodeURIComponent(window.location.hash.match(/^#\/article\/(.+)$/)?.[1] || ''));
   const setActiveTab = (page) => {
     if (!validPages.includes(page)) return;
     window.history.pushState({page}, '', `${window.location.pathname}${window.location.search}#/${page}`);
+    if (page !== 'article') setArticleId('');
     setActiveTabState(page);
     setContentRevision(v => v + 1);
     window.scrollTo({top: 0, behavior: 'instant'});
   };
+  const openArticle = (id) => {
+    window.history.pushState({page:'article'}, '', `${window.location.pathname}${window.location.search}#/article/${encodeURIComponent(id)}`);
+    setArticleId(id); setActiveTabState('article'); setContentRevision(v=>v+1);
+    window.scrollTo({top:0,behavior:'instant'});
+  };
   useEffect(() => {
-    const onHistory = () => { setActiveTabState(getPageFromUrl()); setContentRevision(v => v + 1); };
+    const onHistory = () => { setActiveTabState(getPageFromUrl()); setArticleId(decodeURIComponent(window.location.hash.match(/^#\/article\/(.+)$/)?.[1] || '')); setContentRevision(v => v + 1); };
     const onUpdated = () => setContentRevision(v => v + 1);
     window.addEventListener('popstate', onHistory);
     window.addEventListener('hashchange', onHistory);
@@ -362,7 +370,11 @@ export default function App() {
           supabase.from('seacom_news').select('*').eq('published',true).order('created_at',{ascending:false})
         ]);
         if (!alive) return;
-        if (site.data) { setSiteConfig(prev => ({...prev, heroBadge:site.data.hero_badge,heroTitle:site.data.hero_title,heroSubtitle:site.data.hero_subtitle,aboutText:site.data.about_text,coverUrl:site.data.cover_url})); if(Array.isArray(site.data.home_sections) && site.data.home_sections.length) setHomeSections(site.data.home_sections); }
+        if (site.data) {
+          const icon = document.querySelector('link[rel=\"icon\"]') || document.createElement('link');
+          icon.setAttribute('rel','icon'); icon.setAttribute('href',site.data.favicon_url || '/favicon.svg');
+          if (!icon.parentNode) document.head.appendChild(icon);
+          setSiteConfig(prev => ({...prev, heroBadge:site.data.hero_badge,heroTitle:site.data.hero_title,heroSubtitle:site.data.hero_subtitle,aboutText:site.data.about_text,coverUrl:site.data.cover_url})); if(Array.isArray(site.data.home_sections) && site.data.home_sections.length) setHomeSections(site.data.home_sections); }
         if (!news.error) setNewsList((news.data||[]).map(n => ({id:n.id,title:n.title,summary:n.summary,content:n.body,imageUrl:n.image_url||'https://placehold.co/600x450/1e1b4b/ffffff?text=SEACOM',category:'Notícia',date:new Date(n.created_at).toLocaleDateString('pt-BR')})));
       } catch(e) { console.warn('Conteúdo público indisponível:',e); }
     })(); return () => { alive = false; };
@@ -1172,52 +1184,6 @@ export default function App() {
         </div>
       )}
 
-      {/* MODAL DE LEITURA DE NOTÍCIA (Proporção 4:3 estrita) */}
-      {readingNews && (
-        <div className="fixed inset-0 z-50 bg-slate-900/75 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white rounded-3xl max-w-2xl w-full overflow-hidden shadow-2xl border border-slate-100 my-8">
-            <div className="aspect-[4/3] bg-slate-900 relative">
-              <img
-                src={readingNews.imageUrl}
-                alt={readingNews.title}
-                onError={(e) => {
-                  e.target.src = 'https://placehold.co/800x600/1e1b4b/ffffff?text=SEACOM+Noticia';
-                }}
-                className="w-full h-full object-cover"
-              />
-              <button
-                type="button"
-                onClick={() => setReadingNews(null)}
-                className="absolute top-4 right-4 w-9 h-9 rounded-full bg-slate-900/80 hover:bg-slate-900 text-white flex items-center justify-center"
-              >
-                <X className="w-5 h-5" />
-              </button>
-              <span className="absolute bottom-4 left-6 px-3 py-1 rounded-full text-xs font-bold bg-indigo-600 text-white shadow">
-                {readingNews.category}
-              </span>
-            </div>
-            <div className="p-6 sm:p-8 space-y-4">
-              <div className="text-xs text-slate-400 font-semibold">
-                {readingNews.date} • Por {readingNews.author}
-              </div>
-              <h3 className="text-xl sm:text-2xl font-extrabold text-slate-900 leading-snug">
-                {readingNews.title}
-              </h3>
-              <div className="seacom-richtext text-sm text-slate-700 leading-relaxed" dangerouslySetInnerHTML={{__html:newsToHtml(readingNews.content||'')}} />
-              <div className="pt-4 border-t border-slate-100 flex justify-end">
-                <button
-                  type="button"
-                  onClick={() => setReadingNews(null)}
-                  className="px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold"
-                >
-                  Fechar
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* MODAL CRIAR/EDITAR USUÁRIO */}
       {designatingUserModal && currentAdmin?.isMaster && (
         <div className="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
@@ -1592,7 +1558,7 @@ export default function App() {
             <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14 space-y-4"><h2 className="text-3xl font-extrabold text-slate-900">Sobre a SEACOM 2026</h2><p className="max-w-3xl text-slate-600 leading-relaxed">{siteConfig.aboutText}</p><div className="grid md:grid-cols-3 gap-4 pt-4"><div className="rounded-2xl bg-white border p-5"><strong>Programação</strong><p className="text-sm text-slate-600 mt-2">Palestras, oficinas e mesas redondas</p></div><div className="rounded-2xl bg-white border p-5"><strong>Comunicação</strong><p className="text-sm text-slate-600 mt-2">Notícias e atualizações do evento</p></div><div className="rounded-2xl bg-white border p-5"><strong>Participação</strong><p className="text-sm text-slate-600 mt-2">Atividades e registro de presença</p></div></div></section>
               </React.Fragment>;
               if (section.type === 'schedule') return <section key={section.id} className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-5"><div className="flex flex-wrap items-center justify-between gap-3"><div><span className="text-xs font-bold uppercase tracking-widest text-indigo-600">SEACOM 2026</span><h2 className="text-3xl font-extrabold text-slate-900">Programação</h2></div><button type="button" onClick={() => setActiveTab('schedule')} className="rounded-xl bg-indigo-700 text-white px-5 py-3 font-semibold">Ver programação completa →</button></div><div className="grid gap-4 md:grid-cols-3">{activities.slice(0,3).map(a=><div key={a.id} className="bg-white border border-slate-200 rounded-2xl p-5"><h3 className="font-bold text-slate-900">{a.title}</h3><p className="text-sm text-slate-600 mt-2">{a.description || 'Confira os detalhes na programação.'}</p></div>)}{activities.length===0&&<p className="text-slate-600">Programação em atualização.</p>}</div></section>;
-              if (section.type === 'news') return <section key={section.id} className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-5"><div className="flex flex-wrap items-center justify-between gap-3"><h2 className="text-3xl font-extrabold text-slate-900">Últimas notícias</h2><button type="button" onClick={() => setActiveTab('news')} className="rounded-xl bg-indigo-700 text-white px-5 py-3 font-semibold">Ver todas as notícias →</button></div><div className="grid gap-4 md:grid-cols-3">{newsList.slice(0,3).map(n=><article key={n.id} className="bg-white border border-slate-200 rounded-2xl overflow-hidden"><img src={n.imageUrl} alt={n.title} className="w-full aspect-[4/3] object-cover"/><div className="p-5"><h3 className="font-bold text-slate-900">{n.title}</h3><p className="text-sm text-slate-600 mt-2">{n.summary}</p></div></article>)}{newsList.length===0&&<p className="text-slate-600">Nenhuma notícia publicada.</p>}</div></section>;
+              if (section.type === 'news') return <section key={section.id} className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-5"><div className="flex flex-wrap items-center justify-between gap-3"><h2 className="text-3xl font-extrabold text-slate-900">Últimas notícias</h2><button type="button" onClick={() => setActiveTab('news')} className="rounded-xl bg-indigo-700 text-white px-5 py-3 font-semibold">Ver todas as notícias →</button></div><div className="grid gap-4 md:grid-cols-3">{newsList.slice(0,3).map(n=><article key={n.id} className="bg-white border border-slate-200 rounded-2xl overflow-hidden"><img src={n.imageUrl} alt={n.title} className="w-full aspect-[4/3] object-cover"/><div className="p-5"><h3 className="font-bold text-slate-900">{n.title}</h3><p className="text-sm text-slate-600 mt-2">{n.summary}</p><button type="button" onClick={() => openArticle(n.id)} className="mt-3 text-sm font-bold text-indigo-700 hover:underline">Ler matéria completa →</button></div></article>)}{newsList.length===0&&<p className="text-slate-600">Nenhuma notícia publicada.</p>}</div></section>;
               if (section.type === 'register') return <section key={section.id} className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12"><div className="rounded-3xl bg-indigo-950 text-white p-8 sm:p-12 flex flex-col md:flex-row gap-6 md:items-center md:justify-between"><div><h2 className="text-3xl font-extrabold">Participe da SEACOM 2026</h2><p className="text-indigo-100 mt-3">Acesse a área de inscrições para escolher suas atividades.</p></div><button type="button" onClick={() => setActiveTab('register')} className="rounded-xl bg-white text-indigo-950 px-6 py-3 font-bold">Ir para inscrições →</button></div></section>;
               if (section.type === 'text') return <section key={section.id} className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12"><div className="bg-white border border-slate-200 rounded-3xl p-7 sm:p-10"><h2 className="text-2xl font-extrabold text-slate-900 mb-3">{section.title || 'Informações'}</h2><p className="whitespace-pre-line text-slate-600 leading-relaxed">{section.body || ''}</p></div></section>;
               return null;
@@ -1757,7 +1723,7 @@ export default function App() {
                     </div>
                     <div className="mt-6 pt-4 border-t border-slate-100">
                       <button
-                        onClick={() => setReadingNews(n)}
+                        onClick={() => openArticle(n.id)}
                         className="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1"
                       >
                         <Eye className="w-3.5 h-3.5" /> Ler matéria completa
@@ -1769,6 +1735,23 @@ export default function App() {
             </div>
           </div>
         )}
+
+        {/* Página própria da notícia, com URL compartilhável e histórico do navegador */}
+        {activeTab === 'article' && (() => {
+          const n = newsList.find(item => String(item.id) === articleId);
+          return <main className="max-w-4xl mx-auto px-4 sm:px-6 py-10 min-h-[50vh]">
+            <button type="button" onClick={() => setActiveTab('news')} className="mb-6 text-indigo-700 font-semibold hover:underline">← Voltar às notícias</button>
+            {n ? <article className="bg-white rounded-3xl overflow-hidden border border-slate-200 shadow-sm">
+              <img src={n.imageUrl} alt={n.title} className="w-full aspect-[4/3] object-cover" />
+              <div className="p-6 sm:p-10 space-y-5">
+                <p className="text-sm text-slate-500">{n.date}</p>
+                <h1 className="text-3xl sm:text-4xl font-extrabold text-slate-900">{n.title}</h1>
+                <p className="text-lg text-slate-600">{n.summary}</p>
+                <div className="seacom-richtext text-slate-700 leading-relaxed" dangerouslySetInnerHTML={{__html:newsToHtml(n.content||'')}} />
+              </div>
+            </article> : <div className="rounded-2xl border p-8 text-slate-600">Notícia não encontrada ou ainda não publicada.</div>}
+          </main>;
+        })()}
 
         {/* ABA INSCRIÇÃO */}
         {activeTab === 'register' && (
