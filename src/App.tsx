@@ -1,3 +1,4 @@
+import {newsToHtml} from './lib/newsRichText';
 import AdminSeguro from './AdminSeguro';
 import React, { useState, useMemo, useEffect } from 'react';
 import {
@@ -1144,9 +1145,7 @@ export default function App() {
               <h3 className="text-xl sm:text-2xl font-extrabold text-slate-900 leading-snug">
                 {readingNews.title}
               </h3>
-              <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-line">
-                {readingNews.content}
-              </p>
+              <div className="seacom-richtext text-sm text-slate-700 leading-relaxed" dangerouslySetInnerHTML={{__html:newsToHtml(readingNews.content||'')}} />
               <div className="pt-4 border-t border-slate-100 flex justify-end">
                 <button
                   type="button"
