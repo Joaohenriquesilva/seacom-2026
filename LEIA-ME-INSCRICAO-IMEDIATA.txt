@@ -1,0 +1,18 @@
+SEACOM 2026 — Inscrições instantâneas para testes privados
+
+1. Faça backup do banco Supabase antes de alterar.
+2. Supabase > SQL Editor: execute SQL-INSCRICAO-IMEDIATA-TESTES.sql.
+3. Supabase > Authentication > Providers > Email: desative temporariamente Confirm email.
+4. Publique os arquivos deste projeto no GitHub; aguarde o deploy Netlify.
+5. Teste com um E-MAIL NOVO e uma atividade publicada, cadastrada no Supabase (UUID).
+6. A inscrição só confirma depois que o RPC do banco retornar um protocolo.
+7. Se o Supabase informar que a conta já existe, use um novo e-mail de teste.
+8. Antes de abrir ao público, reative a confirmação de e-mail e implemente fluxo de login/recuperação de senha e proteção adicional contra abuso.
+
+LIMITAÇÕES IMPORTANTES:
+- Inscrição instantânea é para testes privados; o Auth envia/omite confirmação conforme configuração do projeto.
+- O formulário de consulta de inscrição antigo ainda utiliza dados demonstrativos e NÃO consulta o banco.
+- A inscrição utiliza a sessão Supabase Auth; faça o teste em aba anônima se também estiver logada como organizadora.
+- Não grave senhas em tabelas SQL; Supabase Auth cuida delas.
+- O script presume as colunas de participants, registrations e registration_activities descritas no projeto. Se seu banco tiver esquema diferente, pare e envie a mensagem de erro.
+- O RPC registra inscrições em atividades publicadas; não faz controle de vagas simultâneas nem evita contas de teste duplicadas criadas com e-mails diferentes.
