@@ -1,8 +1,8 @@
 /** Sanitização compartilhada do HTML das notícias (sem scripts ou atributos de evento). */
-const TAGS = new Set(['P','DIV','BR','STRONG','B','EM','I','U','S','STRIKE','H2','H3','H4','BLOCKQUOTE','UL','OL','LI','A','SPAN','FONT']);
+const TAGS = new Set(['P','DIV','BR','STRONG','B','EM','I','U','S','STRIKE','H2','H3','H4','BLOCKQUOTE','UL','OL','LI','A','SPAN','FONT','FIGURE','FIGCAPTION','IMG']);
 const FONTS = ['Arial','Georgia','Verdana','Tahoma','Times New Roman','Trebuchet MS','Courier New'];
 const escapeHtml = (s:string) => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-export function isRichText(value:string){return /<\/?(?:p|div|br|strong|b|em|i|u|s|h[2-4]|ul|ol|li|blockquote|span|font|a)\b/i.test(value||'')}
+export function isRichText(value:string){return /<\/?(?:p|div|br|strong|b|em|i|u|s|h[2-4]|ul|ol|li|blockquote|span|font|a|figure|figcaption|img)\b/i.test(value||'')}
 export function sanitizeNewsHtml(value:string):string {
  if(typeof document==='undefined')return escapeHtml(value||'');
  const doc=new DOMParser().parseFromString(value||'','text/html');
@@ -13,6 +13,12 @@ export function sanitizeNewsHtml(value:string):string {
   const children=Array.from(el.childNodes).map(clean).join('');
   if(!TAGS.has(tag))return children;
   if(tag==='BR')return '<br>';
+  if(tag==='IMG'){
+   const src=el.getAttribute('src')||'';
+   if(!/^https:\/\/[^\s"'<>]+$/i.test(src))return '';
+   const alt=el.getAttribute('alt')||'';
+   return `<img src="${escapeHtml(src)}" alt="${escapeHtml(alt)}" loading="lazy">`;
+  }
   const normalizedTag=tag==='FONT'?'span':tag.toLowerCase();
   const attrs:string[]=[];
   if(tag==='A'){

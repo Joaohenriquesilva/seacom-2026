@@ -13,3 +13,7 @@
 .seacom-richtext ol{list-style:decimal;padding-left:1.6em;margin:.6em 0;}
 .seacom-richtext blockquote{border-left:3px solid #6366f1;padding:.3em 1em;margin:1em 0;color:#475569;background:#f8fafc;}
 .seacom-richtext a{color:#4338ca;text-decoration:underline;}
+.seacom-richtext figure{display:block;margin:1.5rem 0;max-width:100%;}
+.seacom-richtext figure img{display:block;width:100%;height:auto;max-height:none;object-fit:contain;}
+.seacom-richtext figure figcaption{font-size:.9em;font-style:italic;color:#64748b;margin-top:.45rem;line-height:1.5;}
+.seacom-richtext figure + p{margin-top:1rem;}
