@@ -1,0 +1,26 @@
+SEACOM 2026 — execução local
+
+1. Extraia o ZIP e abra a pasta seacom-netlify.
+2. No terminal dessa pasta, execute:
+   npm install
+   npm run dev
+3. Abra o endereço mostrado pelo Vite, normalmente http://localhost:5173.
+   Não abra o index.html diretamente por duplo clique.
+
+A página Mídias pode ser acessada pelo menu ou em http://localhost:5173/#/media.
+
+Para conectar os dados, login e inscrições:
+- Copie .env.example para .env.local, na mesma pasta do package.json.
+- Preencha VITE_SUPABASE_URL com a URL real do projeto.
+- Preencha VITE_SUPABASE_PUBLISHABLE_KEY com a chave pública real.
+- Também é aceito VITE_SUPABASE_ANON_KEY em vez de VITE_SUPABASE_PUBLISHABLE_KEY.
+- Não use chaves secretas/service_role.
+- Pare o servidor e execute npm run dev novamente depois de alterar o arquivo.
+
+Sem essa configuração, o site e a página Mídias abrem com um aviso; os serviços que dependem do banco ficam indisponíveis.
+
+Verificação desta versão:
+- npm run build: concluído com sucesso (avisos preexistentes e de tamanho dos arquivos).
+- Renderização das seis páginas testada sem configuração, com URL inválida e com o nome alternativo da chave pública.
+- Três links de mídia e abertura em nova guia conferidos.
+- Operações reais de login, inscrição e banco não foram testadas sem as credenciais do projeto.
