@@ -1,7 +1,10 @@
+import { supabaseUrl, supabaseKey, supabaseConfigurationError } from './lib/supabase';
 import {newsToHtml} from './lib/newsRichText';
 import AdminSeguro from './AdminSeguro';
 import React, { useState, useMemo, useEffect } from 'react';
 import {
+  FolderOpen,
+  ExternalLink,
   Calendar,
   Clock,
   MapPin,
@@ -255,7 +258,7 @@ const INITIAL_REGISTRATIONS = [
 // ============================================================================
 
 export default function App() {
-  const validPages = ['home', 'schedule', 'news', 'register', 'admin', 'article'];
+  const validPages = ['home', 'schedule', 'news', 'media', 'register', 'admin', 'article'];
   const getPageFromUrl = () => {
     const hash = window.location.hash.replace(/^#\/?/, '');
     if (hash.startsWith('article/')) return 'article';
@@ -297,8 +300,8 @@ export default function App() {
     let ativo = true;
     async function carregarProgramacao() {
       try {
-        if (!import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY) {
-          setProgramacaoErro('Arquivo .env.local ausente ou incompleto. Configure VITE_SUPABASE_URL e VITE_SUPABASE_PUBLISHABLE_KEY e reinicie o Vite.');
+        if (supabaseConfigurationError) {
+          setProgramacaoErro(supabaseConfigurationError);
           setProgramacaoStatus('sem-configuracao');
           return;
         }
@@ -365,6 +368,7 @@ export default function App() {
     (async () => {
       try {
         const { supabase } = await import('./lib/supabase');
+        if (!supabase) return;
         const [site, news] = await Promise.all([
           supabase.from('seacom_site_content').select('*').eq('id',1).maybeSingle(),
           supabase.from('seacom_news').select('*').eq('published',true).order('created_at',{ascending:false})
@@ -1062,9 +1066,10 @@ export default function App() {
     setRegistrationBusy(true);
     try {
       // Cliente separado: não substitui a sessão de um organizador que esteja testando o site.
+      if (supabaseConfigurationError) throw new Error('Inscrições indisponíveis: configure a conexão com o Supabase.');
       const { createClient } = await import('@supabase/supabase-js');
-      const url = import.meta.env.VITE_SUPABASE_URL;
-      const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+      const url = supabaseUrl;
+      const key = supabaseKey;
       const client = createClient(url, key, {auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false}});
       const email = regForm.email.trim().toLowerCase();
       // Reaproveita contas criadas em tentativas anteriores: o Auth pode ter
@@ -1409,7 +1414,7 @@ export default function App() {
 
       {/* HEADER */}
       <header className="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-slate-200/80">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between gap-4">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 min-h-20 py-3 flex flex-wrap items-center justify-between gap-4">
           <button
             onClick={() => setActiveTab('home')}
             className="flex items-center gap-3 text-left group focus:outline-none"
@@ -1430,11 +1435,12 @@ export default function App() {
             </div>
           </button>
 
-          <nav className="hidden md:flex items-center gap-1 bg-slate-100/80 p-1.5 rounded-2xl border border-slate-200/60">
+          <nav aria-label="Menu principal" className="order-last w-full xl:order-none xl:w-auto flex items-center gap-1 overflow-x-auto bg-slate-100/80 p-1.5 rounded-2xl border border-slate-200/60">
             {[
               { id: 'home', label: 'Início', icon: Sparkles },
               { id: 'schedule', label: 'Programação', icon: Calendar, badge: activities.length },
               { id: 'news', label: 'Notícias', icon: Newspaper, badge: newsList.length },
+              { id: 'media', label: 'Mídias', icon: FolderOpen },
               { id: 'register', label: 'Inscrição', icon: UserCheck }
             ].map((item) => {
               const Icon = item.icon;
@@ -1442,8 +1448,10 @@ export default function App() {
               return (
                 <button
                   key={item.id}
+                  type="button"
+                  aria-current={isActive ? 'page' : undefined}
                   onClick={() => setActiveTab(item.id)}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
+                  className={`flex shrink-0 items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-600 ${
                     isActive ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
                   }`}
                 >
@@ -1478,6 +1486,8 @@ export default function App() {
           </div>
         </div>
       </header>
+
+      {supabaseConfigurationError && <aside role="status" className="bg-amber-50 border-b border-amber-200 px-4 py-3 text-sm text-amber-950"><div className="max-w-7xl mx-auto">A conexão com o sistema do evento ainda não está configurada. Inscrições, login e dados atualizados ficam indisponíveis até a configuração do Supabase. A página Mídias continua acessível.</div></aside>}
 
       {/* CONTEÚDO */}
       <main className="flex-1">
@@ -1752,6 +1762,28 @@ export default function App() {
             </article> : <div className="rounded-2xl border p-8 text-slate-600">Notícia não encontrada ou ainda não publicada.</div>}
           </main>;
         })()}
+
+        {activeTab === 'media' && (
+          <section aria-labelledby="media-title" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-14">
+            <h1 id="media-title" className="text-3xl sm:text-4xl font-extrabold text-slate-900">Mídias</h1>
+            <p className="mt-3 text-slate-600">Acesse as fotografias e os materiais de cada dia da SEACOM 2026.</p>
+            <p className="mt-2 text-sm text-slate-500">As pastas do Google Drive abrem em uma nova guia.</p>
+            <div className="grid gap-5 sm:grid-cols-3 mt-8">
+              {[
+                { label: 'Dia 01', url: 'https://drive.google.com/drive/folders/1l8UECGEnjAk0Zy3tYU2aRzVr6qO7hhBu?usp=sharing' },
+                { label: 'Dia 02', url: 'https://drive.google.com/drive/folders/1UgxFkDe_FI6pPpjTNdsG_6m6-H24rOJv?usp=sharing' },
+                { label: 'Dia 03', url: 'https://drive.google.com/drive/folders/16spcxvPa4W6jTrSTITsvtNiW_vYkyQ5E?usp=sharing' }
+              ].map(folder => (
+                <a key={folder.label} href={folder.url} target="_blank" rel="noopener noreferrer"
+                  className="group rounded-3xl border border-slate-200 bg-white p-7 shadow-sm hover:shadow-md hover:border-indigo-400 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-indigo-600">
+                  <FolderOpen aria-hidden="true" className="w-12 h-12 text-indigo-600 mb-5" />
+                  <h2 className="text-xl font-extrabold text-slate-900">{folder.label}</h2>
+                  <span className="mt-3 inline-flex items-center gap-2 text-sm font-semibold text-indigo-700">Abrir pasta <ExternalLink aria-hidden="true" className="w-4 h-4" /><span className="sr-only"> (abre em nova guia)</span></span>
+                </a>
+              ))}
+            </div>
+          </section>
+        )}
 
         {/* ABA INSCRIÇÃO */}
         {activeTab === 'register' && (

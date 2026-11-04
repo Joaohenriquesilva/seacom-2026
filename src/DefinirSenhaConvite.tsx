@@ -1,11 +1,12 @@
+import { supabaseUrl, supabaseKey, supabaseConfigurationError } from './lib/supabase';
 import React, { useEffect, useState } from 'react';
 import { supabase } from './lib/supabase';
 
 /** Tela exclusiva para o retorno de convites do Supabase Auth. */
 export default function DefinirSenhaConvite() {
   const [client] = useState(() => {
-    const url = import.meta.env.VITE_SUPABASE_URL;
-    const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+    const url = supabaseUrl;
+    const key = supabaseKey;
     return url && key ? supabase : null;
   });
   const [ready, setReady] = useState(false);

@@ -1,9 +1,10 @@
+import { supabaseUrl, supabaseKey, supabaseConfigurationError } from './lib/supabase';
 import React,{useEffect,useState} from 'react';
 import EditorNoticia from './EditorNoticia';
 import ProgramacaoAdmin from './ProgramacaoAdmin';
 import {newsPlainText} from './lib/newsRichText';
 import {supabase} from './lib/supabase';
-const url=import.meta.env.VITE_SUPABASE_URL,key=import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+const url=supabaseUrl,key=supabaseKey;
 const sb=url&&key?supabase:null;
 type News={id:string,title:string,summary:string,body:string,image_url:string|null,published:boolean};
 type HomeSection={id:string,type:'hero'|'about'|'text'|'schedule'|'news'|'register',visible:boolean,title?:string,body?:string};
