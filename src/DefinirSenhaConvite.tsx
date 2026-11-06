@@ -1,12 +1,11 @@
-import { supabaseUrl, supabaseKey, supabaseConfigurationError } from './lib/supabase';
 import React, { useEffect, useState } from 'react';
 import { supabase } from './lib/supabase';
 
 /** Tela exclusiva para o retorno de convites do Supabase Auth. */
 export default function DefinirSenhaConvite() {
   const [client] = useState(() => {
-    const url = supabaseUrl;
-    const key = supabaseKey;
+    const url = import.meta.env.VITE_SUPABASE_URL;
+    const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
     return url && key ? supabase : null;
   });
   const [ready, setReady] = useState(false);
@@ -53,7 +52,7 @@ export default function DefinirSenhaConvite() {
   }
 
   return <main className="min-h-screen bg-slate-100 flex items-center justify-center p-4">
-    <section className="bg-white border border-slate-200 rounded-3xl shadow-sm p-7 w-full max-w-md space-y-5">
+    <section className="bg-surface border border-slate-200 rounded-3xl shadow-sm p-7 w-full max-w-md space-y-5">
       <div><p className="text-sm font-bold text-indigo-700">SEACOM 2026</p><h1 className="text-2xl font-extrabold text-slate-900">Criar senha de organizador</h1>
       <p className="text-sm text-slate-600 mt-2">Defina sua senha para acessar o painel administrativo. Depois você será direcionado ao login.</p></div>
       {!ready ? <p>Validando convite...</p> : valid ? <form onSubmit={submit} className="space-y-4">

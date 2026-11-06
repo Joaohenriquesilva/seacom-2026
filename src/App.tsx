@@ -1,4 +1,3 @@
-import { supabaseUrl, supabaseKey, supabaseConfigurationError } from './lib/supabase';
 import {newsToHtml} from './lib/newsRichText';
 import AdminSeguro from './AdminSeguro';
 import React, { useState, useMemo, useEffect } from 'react';
@@ -300,8 +299,8 @@ export default function App() {
     let ativo = true;
     async function carregarProgramacao() {
       try {
-        if (supabaseConfigurationError) {
-          setProgramacaoErro(supabaseConfigurationError);
+        if (!import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY) {
+          setProgramacaoErro('Arquivo .env.local ausente ou incompleto. Configure VITE_SUPABASE_URL e VITE_SUPABASE_PUBLISHABLE_KEY e reinicie o Vite.');
           setProgramacaoStatus('sem-configuracao');
           return;
         }
@@ -368,7 +367,6 @@ export default function App() {
     (async () => {
       try {
         const { supabase } = await import('./lib/supabase');
-        if (!supabase) return;
         const [site, news] = await Promise.all([
           supabase.from('seacom_site_content').select('*').eq('id',1).maybeSingle(),
           supabase.from('seacom_news').select('*').eq('published',true).order('created_at',{ascending:false})
@@ -1066,10 +1064,9 @@ export default function App() {
     setRegistrationBusy(true);
     try {
       // Cliente separado: não substitui a sessão de um organizador que esteja testando o site.
-      if (supabaseConfigurationError) throw new Error('Inscrições indisponíveis: configure a conexão com o Supabase.');
       const { createClient } = await import('@supabase/supabase-js');
-      const url = supabaseUrl;
-      const key = supabaseKey;
+      const url = import.meta.env.VITE_SUPABASE_URL;
+      const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
       const client = createClient(url, key, {auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false}});
       const email = regForm.email.trim().toLowerCase();
       // Reaproveita contas criadas em tentativas anteriores: o Auth pode ter
@@ -1156,7 +1153,7 @@ export default function App() {
 
       {confirmModal && (
         <div className="fixed inset-0 z-50 bg-slate-900/75 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-7 shadow-2xl border border-slate-100 space-y-5">
+          <div className="bg-surface rounded-3xl max-w-md w-full p-6 sm:p-7 shadow-2xl border border-slate-100 space-y-5">
             <div className="flex items-start gap-3.5">
               <div className="w-11 h-11 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center shrink-0">
                 <Trash2 className="w-5 h-5" />
@@ -1194,7 +1191,7 @@ export default function App() {
         <div className="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
           <form
             onSubmit={handleSaveDesignatedUserModal}
-            className="bg-white rounded-3xl max-w-2xl w-full p-6 sm:p-8 shadow-2xl border border-slate-100 my-8 space-y-5"
+            className="bg-surface rounded-3xl max-w-2xl w-full p-6 sm:p-8 shadow-2xl border border-slate-100 my-8 space-y-5"
           >
             <div className="flex items-start justify-between gap-4 border-b border-slate-100 pb-4">
               <div>
@@ -1318,12 +1315,12 @@ export default function App() {
                               });
                             }}
                             className={`p-2.5 rounded-xl border text-left flex items-center gap-2.5 text-xs font-semibold transition ${
-                              checked ? 'bg-white border-indigo-500 text-indigo-950 shadow-sm' : 'bg-white/60 border-slate-200 text-slate-500'
+                              checked ? 'bg-surface border-indigo-500 text-indigo-950 shadow-sm' : 'bg-surface/60 border-slate-200 text-slate-500'
                             }`}
                           >
                             <div
                               className={`w-4 h-4 rounded flex items-center justify-center shrink-0 border ${
-                                checked ? 'bg-indigo-600 border-indigo-600 text-white' : 'border-slate-300 bg-white'
+                                checked ? 'bg-indigo-600 border-indigo-600 text-white' : 'border-slate-300 bg-surface'
                               }`}
                             >
                               {checked && <Check className="w-3 h-3" />}
@@ -1413,13 +1410,13 @@ export default function App() {
       )}
 
       {/* HEADER */}
-      <header className="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-slate-200/80">
+      <header className="sticky top-0 z-40 bg-surface/90 backdrop-blur-md border-b border-slate-200/80">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 min-h-20 py-3 flex flex-wrap items-center justify-between gap-4">
           <button
             onClick={() => setActiveTab('home')}
             className="flex items-center gap-3 text-left group focus:outline-none"
           >
-            <div className="rounded-2xl bg-gradient-to-br from-indigo-600 via-indigo-700 to-violet-700 flex items-center justify-center text-white shadow-md shadow-indigo-500/20 group-hover:scale-105 transition shrink-0 overflow-hidden" style={{width:siteConfig.headerLogoSize||44,height:siteConfig.headerLogoSize||44}}>
+            <div className="rounded-2xl identity-gradient-brand flex items-center justify-center text-white shadow-md shadow-indigo-500/20 group-hover:scale-105 transition shrink-0 overflow-hidden" style={{width:siteConfig.headerLogoSize||44,height:siteConfig.headerLogoSize||44}}>
               {siteConfig.headerLogoUrl ? <img src={siteConfig.headerLogoUrl} alt="Logomarca do evento" className="w-full h-full object-contain" /> : <Radio className="w-6 h-6" />}
             </div>
             <div>
@@ -1452,7 +1449,7 @@ export default function App() {
                   aria-current={isActive ? 'page' : undefined}
                   onClick={() => setActiveTab(item.id)}
                   className={`flex shrink-0 items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-600 ${
-                    isActive ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+                    isActive ? 'bg-surface text-indigo-700 shadow-sm' : 'text-slate-600 hover:text-slate-900 hover:bg-surface/50'
                   }`}
                 >
                   <Icon className="w-4 h-4" />
@@ -1477,7 +1474,7 @@ export default function App() {
                   ? 'bg-slate-900 text-white border-slate-900'
                   : currentAdmin
                   ? 'bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100'
-                  : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                  : 'bg-surface text-slate-700 border-slate-200 hover:bg-slate-100'
               }`}
             >
               <Shield className="w-4 h-4" />
@@ -1487,8 +1484,6 @@ export default function App() {
         </div>
       </header>
 
-      {supabaseConfigurationError && <aside role="status" className="bg-amber-50 border-b border-amber-200 px-4 py-3 text-sm text-amber-950"><div className="max-w-7xl mx-auto">A conexão com o sistema do evento ainda não está configurada. Inscrições, login e dados atualizados ficam indisponíveis até a configuração do Supabase. A página Mídias continua acessível.</div></aside>}
-
       {/* CONTEÚDO */}
       <main className="flex-1">
         {/* ABA HOME */}
@@ -1496,7 +1491,7 @@ export default function App() {
           <div>
             {homeSections.filter(section => section.visible !== false).map(section => {
               if (section.type === 'hero') return <React.Fragment key={section.id}>
-            <section className="relative overflow-hidden bg-slate-950 text-white py-16 lg:py-24" style={siteConfig.coverUrl ? {backgroundImage:`linear-gradient(90deg, rgba(2,6,23,.94),rgba(2,6,23,.72)),url(${siteConfig.coverUrl})`,backgroundPosition:"center",backgroundSize:"cover"} : undefined}>
+            <section className="identity-hero relative overflow-hidden bg-slate-950 text-white py-16 lg:py-24" style={siteConfig.coverUrl ? {backgroundImage:`url(${siteConfig.coverUrl})`,backgroundPosition:"center",backgroundSize:"cover"} : undefined}>
               <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="grid lg:grid-cols-12 gap-12 items-center">
                   <div className="lg:col-span-7 space-y-6">
@@ -1505,7 +1500,7 @@ export default function App() {
                       <span>{siteConfig.heroBadge}</span>
                     </div>
                     <h1 className="text-3xl sm:text-5xl font-extrabold tracking-tight leading-tight">
-                      <span className="text-transparent bg-clip-text bg-gradient-to-r from-white via-indigo-100 to-indigo-300">
+                      <span className="text-transparent bg-clip-text identity-gradient-title">
                         {siteConfig.acronym}:
                       </span>{' '}
                       {siteConfig.heroTitle}
@@ -1523,7 +1518,7 @@ export default function App() {
                       </button>
                       <button
                         onClick={() => setActiveTab('schedule')}
-                        className="px-6 py-3.5 rounded-2xl bg-white/10 hover:bg-white/15 text-white font-semibold text-sm border border-white/15 flex items-center gap-2 transition"
+                        className="px-6 py-3.5 rounded-2xl bg-surface/10 hover:bg-surface/15 text-white font-semibold text-sm border border-white/15 flex items-center gap-2 transition"
                       >
                         <Calendar className="w-4 h-4" />
                         <span>Explorar Programação</span>
@@ -1565,12 +1560,12 @@ export default function App() {
             </section>
               </React.Fragment>;
               if (section.type === 'about') return <React.Fragment key={section.id}>
-            <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14 space-y-4"><h2 className="text-3xl font-extrabold text-slate-900">Sobre a SEACOM 2026</h2><p className="max-w-3xl text-slate-600 leading-relaxed">{siteConfig.aboutText}</p><div className="grid md:grid-cols-3 gap-4 pt-4"><div className="rounded-2xl bg-white border p-5"><strong>Programação</strong><p className="text-sm text-slate-600 mt-2">Palestras, oficinas e mesas redondas</p></div><div className="rounded-2xl bg-white border p-5"><strong>Comunicação</strong><p className="text-sm text-slate-600 mt-2">Notícias e atualizações do evento</p></div><div className="rounded-2xl bg-white border p-5"><strong>Participação</strong><p className="text-sm text-slate-600 mt-2">Atividades e registro de presença</p></div></div></section>
+            <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14 space-y-4"><h2 className="text-3xl font-extrabold text-slate-900">Sobre a SEACOM 2026</h2><p className="max-w-3xl text-slate-600 leading-relaxed">{siteConfig.aboutText}</p><div className="grid md:grid-cols-3 gap-4 pt-4"><div className="rounded-2xl bg-surface border p-5"><strong>Programação</strong><p className="text-sm text-slate-600 mt-2">Palestras, oficinas e mesas redondas</p></div><div className="rounded-2xl bg-surface border p-5"><strong>Comunicação</strong><p className="text-sm text-slate-600 mt-2">Notícias e atualizações do evento</p></div><div className="rounded-2xl bg-surface border p-5"><strong>Participação</strong><p className="text-sm text-slate-600 mt-2">Atividades e registro de presença</p></div></div></section>
               </React.Fragment>;
-              if (section.type === 'schedule') return <section key={section.id} className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-5"><div className="flex flex-wrap items-center justify-between gap-3"><div><span className="text-xs font-bold uppercase tracking-widest text-indigo-600">SEACOM 2026</span><h2 className="text-3xl font-extrabold text-slate-900">Programação</h2></div><button type="button" onClick={() => setActiveTab('schedule')} className="rounded-xl bg-indigo-700 text-white px-5 py-3 font-semibold">Ver programação completa →</button></div><div className="grid gap-4 md:grid-cols-3">{activities.slice(0,3).map(a=><div key={a.id} className="bg-white border border-slate-200 rounded-2xl p-5"><h3 className="font-bold text-slate-900">{a.title}</h3><p className="text-sm text-slate-600 mt-2">{a.description || 'Confira os detalhes na programação.'}</p></div>)}{activities.length===0&&<p className="text-slate-600">Programação em atualização.</p>}</div></section>;
-              if (section.type === 'news') return <section key={section.id} className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-5"><div className="flex flex-wrap items-center justify-between gap-3"><h2 className="text-3xl font-extrabold text-slate-900">Últimas notícias</h2><button type="button" onClick={() => setActiveTab('news')} className="rounded-xl bg-indigo-700 text-white px-5 py-3 font-semibold">Ver todas as notícias →</button></div><div className="grid gap-4 md:grid-cols-3">{newsList.slice(0,3).map(n=><article key={n.id} className="bg-white border border-slate-200 rounded-2xl overflow-hidden"><img src={n.imageUrl} alt={n.title} className="w-full aspect-[4/3] object-cover"/><div className="p-5"><h3 className="font-bold text-slate-900">{n.title}</h3><p className="text-sm text-slate-600 mt-2">{n.summary}</p><button type="button" onClick={() => openArticle(n.id)} className="mt-3 text-sm font-bold text-indigo-700 hover:underline">Ler matéria completa →</button></div></article>)}{newsList.length===0&&<p className="text-slate-600">Nenhuma notícia publicada.</p>}</div></section>;
-              if (section.type === 'register') return <section key={section.id} className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12"><div className="rounded-3xl bg-indigo-950 text-white p-8 sm:p-12 flex flex-col md:flex-row gap-6 md:items-center md:justify-between"><div><h2 className="text-3xl font-extrabold">Participe da SEACOM 2026</h2><p className="text-indigo-100 mt-3">Acesse a área de inscrições para escolher suas atividades.</p></div><button type="button" onClick={() => setActiveTab('register')} className="rounded-xl bg-white text-indigo-950 px-6 py-3 font-bold">Ir para inscrições →</button></div></section>;
-              if (section.type === 'text') return <section key={section.id} className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12"><div className="bg-white border border-slate-200 rounded-3xl p-7 sm:p-10"><h2 className="text-2xl font-extrabold text-slate-900 mb-3">{section.title || 'Informações'}</h2><p className="whitespace-pre-line text-slate-600 leading-relaxed">{section.body || ''}</p></div></section>;
+              if (section.type === 'schedule') return <section key={section.id} className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-5"><div className="flex flex-wrap items-center justify-between gap-3"><div><span className="text-xs font-bold uppercase tracking-widest text-indigo-600">SEACOM 2026</span><h2 className="text-3xl font-extrabold text-slate-900">Programação</h2></div><button type="button" onClick={() => setActiveTab('schedule')} className="rounded-xl bg-indigo-700 text-white px-5 py-3 font-semibold">Ver programação completa →</button></div><div className="grid gap-4 md:grid-cols-3">{activities.slice(0,3).map(a=><div key={a.id} className="bg-surface border border-slate-200 rounded-2xl p-5"><h3 className="font-bold text-slate-900">{a.title}</h3><p className="text-sm text-slate-600 mt-2">{a.description || 'Confira os detalhes na programação.'}</p></div>)}{activities.length===0&&<p className="text-slate-600">Programação em atualização.</p>}</div></section>;
+              if (section.type === 'news') return <section key={section.id} className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-5"><div className="flex flex-wrap items-center justify-between gap-3"><h2 className="text-3xl font-extrabold text-slate-900">Últimas notícias</h2><button type="button" onClick={() => setActiveTab('news')} className="rounded-xl bg-indigo-700 text-white px-5 py-3 font-semibold">Ver todas as notícias →</button></div><div className="grid gap-4 md:grid-cols-3">{newsList.slice(0,3).map(n=><article key={n.id} className="bg-surface border border-slate-200 rounded-2xl overflow-hidden"><img src={n.imageUrl} alt={n.title} className="w-full aspect-[4/3] object-cover"/><div className="p-5"><h3 className="font-bold text-slate-900">{n.title}</h3><p className="text-sm text-slate-600 mt-2">{n.summary}</p><button type="button" onClick={() => openArticle(n.id)} className="mt-3 text-sm font-bold text-indigo-700 hover:underline">Ler matéria completa →</button></div></article>)}{newsList.length===0&&<p className="text-slate-600">Nenhuma notícia publicada.</p>}</div></section>;
+              if (section.type === 'register') return <section key={section.id} className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12"><div className="rounded-3xl bg-indigo-950 text-white p-8 sm:p-12 flex flex-col md:flex-row gap-6 md:items-center md:justify-between"><div><h2 className="text-3xl font-extrabold">Participe da SEACOM 2026</h2><p className="text-indigo-100 mt-3">Acesse a área de inscrições para escolher suas atividades.</p></div><button type="button" onClick={() => setActiveTab('register')} className="rounded-xl bg-surface text-indigo-950 px-6 py-3 font-bold">Ir para inscrições →</button></div></section>;
+              if (section.type === 'text') return <section key={section.id} className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12"><div className="bg-surface border border-slate-200 rounded-3xl p-7 sm:p-10"><h2 className="text-2xl font-extrabold text-slate-900 mb-3">{section.title || 'Informações'}</h2><p className="whitespace-pre-line text-slate-600 leading-relaxed">{section.body || ''}</p></div></section>;
               return null;
             })}
           </div>
@@ -1579,7 +1574,7 @@ export default function App() {
         {/* ABA PROGRAMAÇÃO */}
         {activeTab === 'schedule' && (
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-            <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 rounded-3xl p-6 sm:p-10 text-white mb-8 shadow-lg">
+            <div className="identity-gradient-banner rounded-3xl p-6 sm:p-10 text-white mb-8 shadow-lg">
               <span className="text-xs font-bold uppercase tracking-wider text-indigo-300 bg-indigo-500/20 px-3 py-1 rounded-full">
                 Cronograma Oficial • {siteConfig.acronym}
               </span>
@@ -1595,8 +1590,8 @@ export default function App() {
                   onClick={() => setSelectedDayFilter('all')}
                   className={`px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-bold transition border ${
                     selectedDayFilter === 'all'
-                      ? 'bg-white text-slate-950 border-white shadow-md'
-                      : 'bg-white/10 text-white border-white/15'
+                      ? 'bg-surface text-slate-950 border-white shadow-md'
+                      : 'bg-surface/10 text-white border-white/15'
                   }`}
                 >
                   Todos os Dias ({activities.length})
@@ -1610,7 +1605,7 @@ export default function App() {
                       className={`px-4 py-2.5 rounded-2xl text-left transition border ${
                         isSelected
                           ? 'bg-indigo-500 text-white border-indigo-300 shadow-md'
-                          : 'bg-white/10 text-white border-white/15'
+                          : 'bg-surface/10 text-white border-white/15'
                       }`}
                     >
                       <span className="text-xs sm:text-sm font-bold block">
@@ -1622,7 +1617,7 @@ export default function App() {
               </div>
             </div>
 
-            <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-sm mb-8 flex flex-col md:flex-row justify-between gap-4">
+            <div className="bg-surface rounded-2xl p-4 border border-slate-200/80 shadow-sm mb-8 flex flex-col md:flex-row justify-between gap-4">
               <div className="flex flex-wrap items-center gap-2">
                 {['all', 'Painel', 'Mesa Redonda', 'Oficina'].map((type) => (
                   <button
@@ -1653,7 +1648,7 @@ export default function App() {
                 const day = getDayInfo(act.dayId);
                 const isAlreadySelected = regForm.selectedActivityIds.includes(act.id);
                 return (
-                  <div key={act.id} className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-sm">
+                  <div key={act.id} className="bg-surface rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-sm">
                     <div className="flex flex-col lg:flex-row justify-between gap-6">
                       <div className="space-y-3 flex-1">
                         <div className="flex flex-wrap items-center gap-2.5">
@@ -1710,7 +1705,7 @@ export default function App() {
 
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
               {newsList.map((n) => (
-                <article key={n.id} className="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-sm flex flex-col">
+                <article key={n.id} className="bg-surface rounded-3xl border border-slate-200 overflow-hidden shadow-sm flex flex-col">
                   {/* Proporção estrita 4:3 */}
                   <div className="aspect-[4/3] bg-slate-900 relative overflow-hidden">
                     <img
@@ -1751,7 +1746,7 @@ export default function App() {
           const n = newsList.find(item => String(item.id) === articleId);
           return <main className="max-w-4xl mx-auto px-4 sm:px-6 py-10 min-h-[50vh]">
             <button type="button" onClick={() => setActiveTab('news')} className="mb-6 text-indigo-700 font-semibold hover:underline">← Voltar às notícias</button>
-            {n ? <article className="bg-white rounded-3xl overflow-hidden border border-slate-200 shadow-sm">
+            {n ? <article className="bg-surface rounded-3xl overflow-hidden border border-slate-200 shadow-sm">
               <img src={n.imageUrl} alt={n.title} className="w-full aspect-[4/3] object-cover" />
               <div className="p-6 sm:p-10 space-y-5">
                 <p className="text-sm text-slate-500">{n.date}</p>
@@ -1775,7 +1770,7 @@ export default function App() {
                 { label: 'Dia 03', url: 'https://drive.google.com/drive/folders/16spcxvPa4W6jTrSTITsvtNiW_vYkyQ5E?usp=sharing' }
               ].map(folder => (
                 <a key={folder.label} href={folder.url} target="_blank" rel="noopener noreferrer"
-                  className="group rounded-3xl border border-slate-200 bg-white p-7 shadow-sm hover:shadow-md hover:border-indigo-400 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-indigo-600">
+                  className="group rounded-3xl border border-slate-200 bg-surface p-7 shadow-sm hover:shadow-md hover:border-indigo-400 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-indigo-600">
                   <FolderOpen aria-hidden="true" className="w-12 h-12 text-indigo-600 mb-5" />
                   <h2 className="text-xl font-extrabold text-slate-900">{folder.label}</h2>
                   <span className="mt-3 inline-flex items-center gap-2 text-sm font-semibold text-indigo-700">Abrir pasta <ExternalLink aria-hidden="true" className="w-4 h-4" /><span className="sr-only"> (abre em nova guia)</span></span>
@@ -1791,7 +1786,7 @@ export default function App() {
             <div className="grid lg:grid-cols-12 gap-8">
               <div className="lg:col-span-8">
                 {completedRegistration ? (
-                  <div className="bg-white rounded-3xl border-2 border-emerald-500/40 p-6 sm:p-10 shadow-xl space-y-6">
+                  <div className="bg-surface rounded-3xl border-2 border-emerald-500/40 p-6 sm:p-10 shadow-xl space-y-6">
                     <div className="flex justify-between items-center border-b pb-6">
                       <h2 className="text-2xl font-extrabold text-slate-900">Inscrição Confirmada!</h2>
                       <span className="font-mono font-extrabold text-sm text-emerald-600">
@@ -1807,7 +1802,7 @@ export default function App() {
                     </button>
                   </div>
                 ) : (
-                  <form onSubmit={handleRegisterSubmit} className="bg-white rounded-3xl border p-6 sm:p-8 shadow-sm space-y-8">
+                  <form onSubmit={handleRegisterSubmit} className="bg-surface rounded-3xl border p-6 sm:p-8 shadow-sm space-y-8">
                     <h1 className="text-2xl font-extrabold text-slate-900">Ficha de Inscrição</h1>
                     <div className="space-y-4">
                       <div>
@@ -1874,7 +1869,7 @@ export default function App() {
                               key={act.id}
                               onClick={() => handleToggleActivitySelection(act.id)}
                               className={`p-4 rounded-2xl border-2 cursor-pointer transition flex items-start gap-3.5 ${
-                                isChecked ? 'border-indigo-600 bg-indigo-50/40' : 'border-slate-200 bg-white'
+                                isChecked ? 'border-indigo-600 bg-indigo-50/40' : 'border-slate-200 bg-surface'
                               }`}
                             >
                               <div
@@ -1908,7 +1903,7 @@ export default function App() {
               </div>
 
               <div className="lg:col-span-4">
-                <div className="bg-white rounded-3xl border p-6 shadow-sm space-y-4">
+                <div className="bg-surface rounded-3xl border p-6 shadow-sm space-y-4">
                   <h3 className="text-sm font-extrabold text-slate-900">Consultar Inscrição</h3>
                   <form onSubmit={handleLookupRegistration} className="space-y-2.5">
                     <input

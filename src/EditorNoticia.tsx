@@ -2,7 +2,7 @@ import React,{useEffect,useRef,useState} from 'react';
 import {newsToHtml,sanitizeNewsHtml} from './lib/newsRichText';
 
 type Props={value:string,onChange:(value:string)=>void,resetKey:string,onUploadImage?:(file:File)=>Promise<string>};
-const button='rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-sm font-medium hover:bg-indigo-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-600';
+const button='rounded-md border border-slate-300 bg-surface px-2.5 py-1.5 text-sm font-medium hover:bg-indigo-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-600';
 export default function EditorNoticia({value,onChange,resetKey,onUploadImage}:Props){
  const [font,setFont]=useState('Arial'),[size,setSizeState]=useState('16'),[uploading,setUploading]=useState(false),[uploadError,setUploadError]=useState('');
  const [photoOpen,setPhotoOpen]=useState(false),[photoFile,setPhotoFile]=useState<File|null>(null),[photoPreview,setPhotoPreview]=useState(''),[photoCaption,setPhotoCaption]=useState('');
@@ -23,7 +23,7 @@ export default function EditorNoticia({value,onChange,resetKey,onUploadImage}:Pr
  const cmd=(command:string,arg?:string)=>{restoreSelection();document.execCommand(command,false,arg);sync()};
  const setSize=(size:string)=>{restoreSelection();document.execCommand('fontSize',false,'7');editor.current?.querySelectorAll('font[size="7"]').forEach(el=>{el.removeAttribute('size');(el as HTMLElement).style.fontSize=size+'px'});sync()};
  const link=()=>{const url=window.prompt('Cole o endereço do link (https://...)');if(url===null)return;if(!/^https?:\/\//i.test(url)){window.alert('Use um endereço começando com https:// ou http://');return;}cmd('createLink',url)};
- return <div className="overflow-hidden rounded-xl border border-slate-300 bg-white">
+ return <div className="overflow-hidden rounded-xl border border-slate-300 bg-surface">
   <div className="flex flex-wrap items-center gap-1.5 border-b bg-slate-50 p-2" onMouseDown={e=>{if((e.target as HTMLElement).closest('button'))e.preventDefault()}} role="toolbar" aria-label="Ferramentas de formatação da notícia">
    <select aria-label="Fonte" title="Fonte" className={button} value={font} onChange={e=>{setFont(e.target.value);cmd('fontName',e.target.value)}}>{['Arial','Georgia','Verdana','Tahoma','Times New Roman','Trebuchet MS','Courier New'].map(f=><option key={f} value={f}>{f}</option>)}</select>
    <select aria-label="Tamanho da fonte" title="Tamanho da fonte" className={button} value={size} onChange={e=>{setSizeState(e.target.value);setSize(e.target.value)}}>{[12,14,16,18,20,24,28,32,36,40].map(s=><option key={s} value={s}>{s}px</option>)}</select>
@@ -49,7 +49,7 @@ export default function EditorNoticia({value,onChange,resetKey,onUploadImage}:Pr
   <div ref={editor} contentEditable suppressContentEditableWarning role="textbox" aria-label="Texto completo da notícia" aria-multiline="true" data-placeholder="Escreva aqui o texto completo da notícia..." className="seacom-richtext min-h-[260px] p-4 text-slate-800 outline-none focus:ring-2 focus:ring-inset focus:ring-indigo-500" onInput={()=>{sync();rememberSelection()}} onKeyUp={rememberSelection} onMouseUp={rememberSelection} onBlur={sync} onPaste={e=>{e.preventDefault();const plain=e.clipboardData.getData('text/plain');document.execCommand('insertText',false,plain);sync()}}/>
   {uploadError&&!photoOpen&&<p role="alert" className="p-2 text-red-700">{uploadError}</p>}
   {photoOpen&&<div className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto bg-slate-950/70 p-4" role="presentation" onMouseDown={e=>{if(e.target===e.currentTarget)closePhoto()}}>
-   <div role="dialog" aria-modal="true" aria-labelledby="seacom-photo-title" className="my-auto w-full max-w-2xl overflow-hidden rounded-2xl bg-white shadow-2xl">
+   <div role="dialog" aria-modal="true" aria-labelledby="seacom-photo-title" className="my-auto w-full max-w-2xl overflow-hidden rounded-2xl bg-surface shadow-2xl">
     <div className="flex items-center justify-between border-b px-5 py-4"><div><h3 id="seacom-photo-title" className="text-lg font-bold text-slate-900">Adicionar fotografia à notícia</h3><p className="text-sm text-slate-500">Veja a imagem e a legenda antes de inserir no texto.</p></div><button type="button" disabled={uploading} aria-label="Fechar janela" className={button} onClick={closePhoto}>✕</button></div>
     <div className="max-h-[75vh] space-y-4 overflow-y-auto p-5">
      <div><label htmlFor="seacom-photo-file" className="mb-1 block text-sm font-semibold text-slate-700">Fotografia</label><input id="seacom-photo-file" ref={fileInput} type="file" accept="image/jpeg,image/png,image/webp" className="block w-full rounded-lg border border-slate-300 p-2 text-sm" disabled={uploading} onChange={e=>{const f=e.target.files?.[0];if(f)choosePhoto(f)}}/><p className="mt-1 text-xs text-slate-500">JPG, PNG ou WebP • até 5 MB. Você pode adicionar quantas fotografias precisar, uma de cada vez.</p></div>

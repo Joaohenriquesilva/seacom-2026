@@ -1,5 +1,7 @@
 # SEACOM 2026 — publicação pelo GitHub + Netlify
 
+Para os novos controles de cores, comece por **INSTRUCOES-IDENTIDADE-VISUAL.md** e execute a migração **SQL-IDENTIDADE-VISUAL.sql**. Veja os resultados dos testes em **VALIDACAO-DA-ENTREGA.md**.
+
 Este repositório contém o site React/Vite e os arquivos de configuração necessários para publicar o **frontend** no Netlify.
 
 ## 1. Subir para o GitHub
@@ -41,6 +43,6 @@ Crie um `.env.local` com os valores reais (use `.env.example` como modelo). Esse
 ## Observações importantes
 
 - **Inscrições públicas e autenticação de participantes:** há recursos demonstrativos no projeto. Não divulgue inscrição ou presença como totalmente operacionais antes de validar persistência real e autenticação no Supabase.
-- **Dependências:** o ZIP recebido continha `package-lock.json` antigo, sem `qrcode` e `exceljs`. Ele foi retirado para permitir que o Netlify faça a instalação conforme `package.json`. Após executar `npm install` com acesso à internet, envie ao GitHub o novo `package-lock.json` gerado para builds reproduzíveis.
-- **Compilação:** não foi possível validar `npm run build` neste ambiente porque o registro npm não estava acessível. Faça o primeiro deploy e, se houver erro de build, envie o log completo para correção.
+- **Dependências:** o arquivo package-lock.json acompanha esta atualização. Use npm ci para instalar as versões fixadas.
+- **Compilação:** npm run build e os sete testes de identidade visual passaram nesta atualização. Consulte VALIDACAO-DA-ENTREGA.md para os limites da validação.
 - Não coloque chave `service_role`, senha de administrador ou outros segredos em variáveis `VITE_`: elas ficam públicas no JavaScript do navegador.
