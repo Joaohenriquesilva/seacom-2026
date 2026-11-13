@@ -54,6 +54,11 @@ body{background:rgb(var(--seacom-background));color:rgb(var(--seacom-text));}
   from { opacity: 0; transform: translateY(.32em); }
   to { opacity: 1; transform: translateY(0); }
 }
+@media (max-width: 1279px) and (prefers-reduced-motion: no-preference) {
+  .mobile-navigation > button {
+    animation: cover-letter-enter 260ms ease-out var(--menu-delay) both;
+  }
+}
 .identity-gradient-banner{background-image:var(--seacom-gradient-banner);}
 :where(button,a,input,textarea,select,[tabindex]):focus-visible{outline:3px solid rgb(var(--seacom-focus));outline-offset:3px;}
 :where(button,input,select,textarea):disabled{cursor:not-allowed;opacity:.55;}

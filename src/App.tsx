@@ -1,7 +1,7 @@
 import {newsToHtml} from './lib/newsRichText';
 import AdminSeguro from './AdminSeguro';
 import { PublicNotices } from './Notices';
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import {
   FolderOpen,
   ExternalLink,
@@ -30,6 +30,7 @@ import {
   AlertCircle,
   Check,
   X,
+  Menu,
   ArrowRight,
   Copy,
   Radio,
@@ -266,6 +267,8 @@ export default function App() {
     return new URLSearchParams(window.location.search).get('admin') === 'login' ? 'admin' : 'home';
   };
   const [activeTab, setActiveTabState] = useState(getPageFromUrl);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const mobileMenuButton = useRef<HTMLButtonElement>(null);
   const [animateCover, setAnimateCover] = useState(() => activeTab === 'home');
   useEffect(() => {
     if (!animateCover) return;
@@ -280,6 +283,7 @@ export default function App() {
   const [articleId, setArticleId] = useState(() => decodeURIComponent(window.location.hash.match(/^#\/article\/(.+)$/)?.[1] || ''));
   const setActiveTab = (page) => {
     if (!validPages.includes(page)) return;
+    setMobileMenuOpen(false);
     window.history.pushState({page}, '', `${window.location.pathname}${window.location.search}#/${page}`);
     if (page !== 'article') setArticleId('');
     setActiveTabState(page);
@@ -292,7 +296,7 @@ export default function App() {
     window.scrollTo({top:0,behavior:'instant'});
   };
   useEffect(() => {
-    const onHistory = () => { setActiveTabState(getPageFromUrl()); setArticleId(decodeURIComponent(window.location.hash.match(/^#\/article\/(.+)$/)?.[1] || '')); setContentRevision(v => v + 1); };
+    const onHistory = () => { setMobileMenuOpen(false); setActiveTabState(getPageFromUrl()); setArticleId(decodeURIComponent(window.location.hash.match(/^#\/article\/(.+)$/)?.[1] || '')); setContentRevision(v => v + 1); };
     const onUpdated = () => setContentRevision(v => v + 1);
     window.addEventListener('popstate', onHistory);
     window.addEventListener('hashchange', onHistory);
@@ -1421,8 +1425,14 @@ export default function App() {
       )}
 
       {/* HEADER */}
-      <header className="sticky top-0 z-40 bg-surface/90 backdrop-blur-md border-b border-slate-200/80">
-        <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 min-h-20 py-3 flex flex-wrap xl:flex-nowrap items-center justify-between gap-3">
+      <header className="sticky top-0 z-40 bg-surface/90 backdrop-blur-md border-b border-slate-200/80"
+        onKeyDown={event => {
+          if (event.key === 'Escape' && mobileMenuOpen) {
+            setMobileMenuOpen(false);
+            mobileMenuButton.current?.focus();
+          }
+        }}>
+        <div className="relative max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 min-h-20 py-3 flex items-center justify-between gap-3">
           <button
             onClick={() => setActiveTab('home')}
             className="flex min-w-0 items-center gap-3 text-left group focus:outline-none"
@@ -1435,15 +1445,23 @@ export default function App() {
                 <span className="text-xl font-extrabold tracking-tight text-slate-900">
                   {siteConfig.acronym}
                 </span>
-                <span className={`${siteConfig.headerShowEdition === false ? 'hidden' : 'hidden sm:inline-block'} text-[11px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200/60`}>
+                <span className={`${siteConfig.headerShowEdition === false ? 'hidden' : 'hidden xl:inline-block'} text-[11px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200/60`}>
                   {siteConfig.edition}
                 </span>
               </div>
-              <p className="text-xs text-slate-500 font-medium line-clamp-1">{siteConfig.fullName}</p>
+              <p className="text-xs text-slate-500 font-medium xl:line-clamp-1">{siteConfig.fullName}</p>
             </div>
           </button>
 
-          <nav aria-label="Menu principal" className="order-last w-full xl:order-none xl:w-auto min-w-0 flex items-center gap-1 overflow-x-auto bg-slate-100/80 p-1.5 rounded-2xl border border-slate-200/60">
+          <button type="button" ref={mobileMenuButton} aria-controls="main-navigation"
+            aria-expanded={mobileMenuOpen} aria-label={mobileMenuOpen ? 'Fechar menu' : 'Abrir menu'}
+            onClick={() => setMobileMenuOpen(open => !open)}
+            className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-slate-200 bg-surface text-slate-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-600 xl:hidden">
+            {mobileMenuOpen ? <X aria-hidden="true" className="h-5 w-5" /> : <Menu aria-hidden="true" className="h-5 w-5" />}
+          </button>
+
+          <nav id="main-navigation" aria-label="Menu principal"
+            className={`${mobileMenuOpen ? 'mobile-navigation flex' : 'hidden'} absolute inset-x-4 top-full mt-2 max-h-[65dvh] flex-col gap-1 overflow-y-auto rounded-2xl border border-slate-200 bg-surface p-2 shadow-lg sm:inset-x-6 xl:static xl:mt-0 xl:flex xl:max-h-none xl:min-w-0 xl:flex-row xl:items-center xl:overflow-x-auto xl:bg-slate-100/80 xl:p-1.5 xl:shadow-none`}>
             {[
               { id: 'home', label: 'Início', icon: Sparkles },
               { id: 'schedule', label: 'Programação', icon: Calendar, badge: activities.length },
@@ -1451,7 +1469,7 @@ export default function App() {
               { id: 'media', label: 'Mídias', icon: FolderOpen },
               { id: 'register', label: 'Inscrição', icon: UserCheck },
               { id: 'editais', label: 'Editais e Avisos', icon: FileText }
-            ].map((item) => {
+            ].map((item, index) => {
               const Icon = item.icon;
               const isActive = activeTab === item.id;
               return (
@@ -1459,8 +1477,12 @@ export default function App() {
                   key={item.id}
                   type="button"
                   aria-current={isActive ? 'page' : undefined}
-                  onClick={() => setActiveTab(item.id)}
-                  className={`flex shrink-0 items-center gap-2 whitespace-nowrap px-3 py-2 2xl:px-4 rounded-xl text-sm font-semibold transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-600 ${
+                  onClick={() => {
+                    if (mobileMenuOpen && mobileMenuButton.current?.getClientRects().length) mobileMenuButton.current.focus();
+                    setActiveTab(item.id);
+                  }}
+                  style={{ '--menu-delay': index * 45 + 'ms' } as React.CSSProperties}
+                  className={`flex min-h-11 shrink-0 items-center gap-2 whitespace-nowrap px-3 py-2 2xl:px-4 rounded-xl text-left text-sm font-semibold transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-600 xl:min-h-0 ${
                     isActive ? 'bg-surface text-indigo-700 shadow-sm' : 'text-slate-600 hover:text-slate-900 hover:bg-surface/50'
                   }`}
                 >
@@ -1471,7 +1493,7 @@ export default function App() {
             })}
           </nav>
 
-          <div className="flex shrink-0 items-center gap-2.5 whitespace-nowrap">
+          <div className="hidden shrink-0 items-center gap-2.5 whitespace-nowrap xl:flex">
             <button
               onClick={() => setActiveTab('register')}
               className="hidden sm:inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm shadow-indigo-500/20 transition"
