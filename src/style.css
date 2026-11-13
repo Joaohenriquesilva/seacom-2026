@@ -35,6 +35,16 @@ body{background:rgb(var(--seacom-background));color:rgb(var(--seacom-text));}
 .identity-hero h1{color:rgb(var(--seacom-heroText));}
 .identity-gradient-brand{background-image:var(--seacom-gradient-brand);}
 .identity-gradient-title{background-image:var(--seacom-gradient-title);}
+@media (prefers-reduced-motion: no-preference) {
+  .cover-letter {
+    display: inline-block;
+    animation: cover-letter-enter 580ms cubic-bezier(.2,.65,.3,1) both;
+  }
+}
+@keyframes cover-letter-enter {
+  from { opacity: 0; transform: translateY(.32em); }
+  to { opacity: 1; transform: translateY(0); }
+}
 .identity-gradient-banner{background-image:var(--seacom-gradient-banner);}
 :where(button,a,input,textarea,select,[tabindex]):focus-visible{outline:3px solid rgb(var(--seacom-focus));outline-offset:3px;}
 :where(button,input,select,textarea):disabled{cursor:not-allowed;opacity:.55;}

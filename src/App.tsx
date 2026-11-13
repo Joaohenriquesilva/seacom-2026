@@ -1,5 +1,6 @@
 import {newsToHtml} from './lib/newsRichText';
 import AdminSeguro from './AdminSeguro';
+import { PublicNotices } from './Notices';
 import React, { useState, useMemo, useEffect } from 'react';
 import {
   FolderOpen,
@@ -257,7 +258,7 @@ const INITIAL_REGISTRATIONS = [
 // ============================================================================
 
 export default function App() {
-  const validPages = ['home', 'schedule', 'news', 'media', 'register', 'admin', 'article'];
+  const validPages = ['home', 'schedule', 'news', 'media', 'register', 'editais', 'admin', 'article'];
   const getPageFromUrl = () => {
     const hash = window.location.hash.replace(/^#\/?/, '');
     if (hash.startsWith('article/')) return 'article';
@@ -265,6 +266,16 @@ export default function App() {
     return new URLSearchParams(window.location.search).get('admin') === 'login' ? 'admin' : 'home';
   };
   const [activeTab, setActiveTabState] = useState(getPageFromUrl);
+  const [animateCover, setAnimateCover] = useState(() => activeTab === 'home');
+  useEffect(() => {
+    if (!animateCover) return;
+    if (activeTab !== 'home') {
+      setAnimateCover(false);
+      return;
+    }
+    const timeout = window.setTimeout(() => setAnimateCover(false), 1300);
+    return () => window.clearTimeout(timeout);
+  }, [activeTab, animateCover]);
   const [contentRevision, setContentRevision] = useState(0);
   const [articleId, setArticleId] = useState(() => decodeURIComponent(window.location.hash.match(/^#\/article\/(.+)$/)?.[1] || ''));
   const setActiveTab = (page) => {
@@ -1438,7 +1449,8 @@ export default function App() {
               { id: 'schedule', label: 'Programação', icon: Calendar, badge: activities.length },
               { id: 'news', label: 'Notícias', icon: Newspaper, badge: newsList.length },
               { id: 'media', label: 'Mídias', icon: FolderOpen },
-              { id: 'register', label: 'Inscrição', icon: UserCheck }
+              { id: 'register', label: 'Inscrição', icon: UserCheck },
+              { id: 'editais', label: 'Editais e Avisos', icon: FileText }
             ].map((item) => {
               const Icon = item.icon;
               const isActive = activeTab === item.id;
@@ -1500,10 +1512,25 @@ export default function App() {
                       <span>{siteConfig.heroBadge}</span>
                     </div>
                     <h1 className="text-3xl sm:text-5xl font-extrabold tracking-tight leading-tight">
-                      <span className="text-transparent bg-clip-text identity-gradient-title">
-                        {siteConfig.acronym}:
-                      </span>{' '}
-                      {siteConfig.heroTitle}
+                      <span className={animateCover ? 'sr-only' : 'hidden'}>{siteConfig.acronym}: {siteConfig.heroTitle}</span>
+                      <span aria-hidden={animateCover || undefined}>
+                        <span className={`text-transparent bg-clip-text identity-gradient-title ${animateCover ? 'cover-letter' : ''}`}>
+                          {siteConfig.acronym}:
+                        </span>{' '}
+                        {animateCover ? (() => {
+                          let index = 0;
+                          const segmenter = typeof Intl.Segmenter === 'function'
+                            ? new Intl.Segmenter('pt-BR', { granularity: 'grapheme' }) : null;
+                          return siteConfig.heroTitle.split(/(\s+)/).map((word, wordIndex) =>
+                            /^\s+$/.test(word) ? word : <span key={wordIndex} className="whitespace-nowrap">
+                              {(segmenter ? Array.from(segmenter.segment(word), item => item.segment) : Array.from(word)).map(segment =>
+                                <span key={index} className="cover-letter"
+                                  style={{ animationDelay: Math.min(++index * 24, 620) + 'ms' }}>{segment}</span>
+                              )}
+                            </span>
+                          );
+                        })() : siteConfig.heroTitle}
+                      </span>
                     </h1>
                     <p className="text-slate-300 text-base sm:text-lg leading-relaxed max-w-2xl">
                       {siteConfig.heroSubtitle}
@@ -1758,6 +1785,7 @@ export default function App() {
           </main>;
         })()}
 
+        {activeTab === 'editais' && <PublicNotices />}
         {activeTab === 'media' && (
           <section aria-labelledby="media-title" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-14">
             <h1 id="media-title" className="text-3xl sm:text-4xl font-extrabold text-slate-900">Mídias</h1>

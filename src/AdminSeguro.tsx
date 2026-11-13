@@ -1,3 +1,4 @@
+import { NoticesAdmin } from './Notices';
 import ModulosAdmin from './ModulosAdmin';
 import { supabase } from './lib/supabase';
 import React, { useEffect, useState } from 'react';
@@ -20,6 +21,7 @@ export default function AdminSeguro(){
  const [email,setEmail]=useState(''),[password,setPassword]=useState(''),[loading,setLoading]=useState(true),[busy,setBusy]=useState(false),[message,setMessage]=useState('');
  const [newEmail,setNewEmail]=useState(''),[newName,setNewName]=useState(''),[newProfile,setNewProfile]=useState('communication');
  const [newOverrides,setNewOverrides]=useState<Record<string,boolean>>({});
+ const [canPublishNotices,setCanPublishNotices]=useState(false);
  const [activeTab,setActiveTab]=useState('news');
  useEffect(()=>{let alive=true,subscription:any; (async()=>{try{
   const url=import.meta.env.VITE_SUPABASE_URL,key=import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
@@ -29,10 +31,10 @@ export default function AdminSeguro(){
   if(alive)setSession(data.session);const {data:auth}=sb.auth.onAuthStateChange((_event:string,next:any)=>{if(alive)setSession(next)});subscription=auth.subscription;
  }catch(e:any){if(alive)setMessage(e.message)}finally{if(alive)setLoading(false)}})();return()=>{alive=false;subscription?.unsubscribe()}},[]);
  async function refresh(sb:any){const {data,error}=await sb.rpc('seacom_list_organizers');if(error)throw error;setMembers(data||[])}
- useEffect(()=>{let alive=true;setMember(null);setMembers([]);setEditing(null);if(!client||!session?.user?.id)return;
+ useEffect(()=>{let alive=true;setCanPublishNotices(false);setMember(null);setMembers([]);setEditing(null);if(!client||!session?.user?.id)return;
  (async()=>{const {data,error}=await client.from('admin_members').select('user_id,display_name,profile_id,is_owner,is_active').eq('user_id',session.user.id).maybeSingle();
  if(!alive)return;if(error){setMessage('Permissões: '+error.message);return}if(!data?.is_active){setMessage('Conta sem acesso administrativo ativo.');return}
- setMember(data);setMessage('');if(data.is_owner){try{await refresh(client)}catch(e:any){if(alive)setMessage('Não foi possível carregar os organizadores. Informe o suporte técnico: '+e.message)}}})();return()=>{alive=false}},[client,session?.user?.id]);
+ setMember(data);setMessage('');void client.rpc('seacom_can',{p_permission:'noticias.publicar'}).then(({data:allowed}:any)=>{if(alive)setCanPublishNotices(allowed===true)});if(data.is_owner){try{await refresh(client)}catch(e:any){if(alive)setMessage('Não foi possível carregar os organizadores. Informe o suporte técnico: '+e.message)}}})();return()=>{alive=false}},[client,session?.user?.id]);
  async function login(e:React.FormEvent){e.preventDefault();setMessage('Autenticando...');const {error}=await client.auth.signInWithPassword({email:email.trim(),password});setPassword('');setMessage(error?'Login: '+error.message:'')}
  async function add(e:React.FormEvent){e.preventDefault();setBusy(true);setMessage('');try{
   const {data:authData,error:authError}=await client.auth.getSession();
@@ -74,7 +76,7 @@ export default function AdminSeguro(){
  {loading?<p>Verificando acesso...</p>:!session?<form onSubmit={login} className="max-w-md space-y-3"><label className="block">E-mail<input type="email" required autoComplete="username" className={field} value={email} onChange={e=>setEmail(e.target.value)}/></label><label className="block">Senha<input type="password" required autoComplete="current-password" className={field} value={password} onChange={e=>setPassword(e.target.value)}/></label><button className="bg-indigo-700 text-white rounded-xl px-5 py-3">Entrar</button></form>:<>
  <div className="flex flex-wrap justify-between gap-3"><span>Conectado: <strong>{session.user.email}</strong></span><button type="button" className="border rounded-xl px-4 py-2" onClick={()=>client.auth.signOut()}>Sair</button></div>
  {member?<><p className="bg-indigo-50 rounded-xl p-3">Perfil: <strong>{profileNames[member.profile_id]||member.profile_id}</strong>{member.is_owner?' — Acesso principal':''}</p>
- <nav aria-label="Seções administrativas" className="flex flex-wrap gap-2 border-b border-slate-200 pb-4">{[...(member.is_owner?[['invite','Convidar organizador'],['organizers','Organizadores e acessos']]:[]),['news','Publicar notícia'],['programming','Criar programação'],['home','Página inicial e capa'],['identity','Cores e identidade visual'],['attendance','QR Code e presenças']].map(([id,label])=><button key={id} type="button" aria-current={activeTab===id?'page':undefined} onClick={()=>{setActiveTab(id);setMessage('')}} className={'rounded-xl px-4 py-2 text-sm font-semibold transition-colors '+(activeTab===id?'bg-indigo-700 text-white shadow-sm':'border border-slate-200 bg-surface text-slate-700 hover:bg-indigo-50')}>{label}</button>)}</nav>
+ <nav aria-label="Seções administrativas" className="flex flex-wrap gap-2 border-b border-slate-200 pb-4">{[...(member.is_owner?[['invite','Convidar organizador'],['organizers','Organizadores e acessos']]:[]),['news','Publicar notícia'],...(canPublishNotices?[['editais','Editais e Avisos']]:[]),['programming','Criar programação'],['home','Página inicial e capa'],['identity','Cores e identidade visual'],['attendance','QR Code e presenças']].map(([id,label])=><button key={id} type="button" aria-current={activeTab===id?'page':undefined} onClick={()=>{setActiveTab(id);setMessage('')}} className={'rounded-xl px-4 py-2 text-sm font-semibold transition-colors '+(activeTab===id?'bg-indigo-700 text-white shadow-sm':'border border-slate-200 bg-surface text-slate-700 hover:bg-indigo-50')}>{label}</button>)}</nav>
  {member.is_owner&&activeTab==='invite'&&<div className="space-y-3"><h2 className="text-lg font-bold">Convidar organizador</h2><p className="text-sm text-slate-600">Informe o e-mail e escolha as permissões. O sistema envia o convite por e-mail; não é necessário cadastrar a pessoa manualmente.</p>
  <form onSubmit={add} className="space-y-4"><div className="grid sm:grid-cols-2 gap-3"><label>Nome<input className={field} required minLength={2} maxLength={100} value={newName} onChange={e=>setNewName(e.target.value)}/></label><label>E-mail do convidado<input className={field} type="email" required value={newEmail} onChange={e=>setNewEmail(e.target.value)}/></label><label>Perfil padrão<select className={field} value={newProfile} onChange={e=>setNewProfile(e.target.value)}>{Object.entries(profileNames).filter(([k])=>k!=='owner').map(([k,v])=><option key={k} value={k}>{v}</option>)}</select></label></div>
  <p className="text-sm text-slate-600">Permissões individuais: Padrão segue o perfil selecionado; Permitir ou Bloquear substitui o perfil.</p>
@@ -87,6 +89,7 @@ export default function AdminSeguro(){
  {Object.entries(groups).map(([group,actions])=><div key={group} className="space-y-2"><h3 className="font-semibold">{group}</h3><div className="grid sm:grid-cols-2 gap-2">{actions.map(action=>{const k=keys[group]+'.'+action;const value=editing.overrides?.[k];return <label key={k} className="flex items-center justify-between gap-2 text-sm">{labels[action]||action}<select aria-label={group+' '+action} className="border rounded-lg p-2" value={value===undefined?'default':value?'allow':'deny'} onChange={e=>{const overrides={...editing.overrides};if(e.target.value==='default')delete overrides[k];else overrides[k]=e.target.value==='allow';setEditing({...editing,overrides})}}><option value="default">Padrão</option><option value="allow">Permitir</option><option value="deny">Bloquear</option></select></label>})}</div></div>)}
  <div className="flex gap-3"><button type="button" disabled={busy} className="bg-indigo-700 text-white rounded-xl px-5 py-3" onClick={save}>Salvar permissões</button><button type="button" className="border rounded-xl px-5 py-3" onClick={()=>setEditing(null)}>Cancelar</button></div></div>}
  </>}
+ {canPublishNotices&&activeTab==='editais'&&<NoticesAdmin />}
  <ModulosAdmin isOwner={member.is_owner} activeTab={activeTab}/><p className="text-sm text-slate-600">As inscrições públicas ainda são demonstrativas; o credenciamento exige inscrições reais confirmadas.</p></>:<p>Aguardando confirmação das permissões...</p>}</>}
  </div></section>
 }
