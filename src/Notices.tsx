@@ -1,11 +1,12 @@
 import React, { useEffect, useState, type FormEvent } from 'react';
-import { ExternalLink, FileText } from 'lucide-react';
+import { ExternalLink, FileText, Link2 } from 'lucide-react';
 import { supabase } from './lib/supabase';
 
 type Notice = {
   id: string;
   title: string;
-  file_path: string;
+  file_path: string | null;
+  external_url: string | null;
   position: number;
   active: boolean;
   revision: string;
@@ -16,6 +17,18 @@ const bucket = () => supabase.storage.from('seacom-notices');
 const ordered = () => table().select('*').order('position').order('title').order('id');
 const field = 'block w-full rounded-xl border border-slate-300 bg-surface p-2';
 const button = 'rounded-xl border border-slate-300 px-4 py-2 disabled:opacity-50';
+
+function webUrl(value: string) {
+  try {
+    if (!/^https?:\/\//i.test(value) || value.length > 2048) return;
+    const url = new URL(value);
+    if (['http:', 'https:'].includes(url.protocol) && !url.username && !url.password && url.href.length <= 2048) {
+      return url.href;
+    }
+  } catch {
+    return;
+  }
+}
 
 export function PublicNotices() {
   const [rows, setRows] = useState<(Notice & { url?: string })[] | null>(null);
@@ -35,14 +48,15 @@ export function PublicNotices() {
           }
           return;
         }
-        const { data: signed, error: signError } = await bucket().createSignedUrls(
-          documents.map(doc => doc.file_path), 900
-        );
-        if (signError) throw signError;
-        const urls = new Map(signed?.map(item => [item.path, item.signedUrl]));
+        const paths = documents.flatMap(doc => doc.file_path ? [doc.file_path] : []);
+        const signed = paths.length ? await bucket().createSignedUrls(paths, 900) : null;
+        const urls = new Map(signed?.data?.map(item => [item.path, item.signedUrl]));
         if (current) {
-          setRows(documents.map(doc => ({ ...doc, url: urls.get(doc.file_path) })));
-          setError('');
+          setRows(documents.map(doc => ({
+            ...doc,
+            url: doc.file_path ? urls.get(doc.file_path) : webUrl(doc.external_url ?? '')
+          })));
+          setError(signed?.error ? 'Não foi possível preparar os PDFs. Tente recarregar a página.' : '');
         }
       } catch {
         if (current) setError('Não foi possível carregar os PDFs. Tente recarregar a página.');
@@ -59,27 +73,30 @@ export function PublicNotices() {
   }, []);
 
   return (
-    <section className="mx-auto max-w-5xl space-y-5 px-4 py-12 sm:px-6">
-      <h1 className="text-3xl font-extrabold text-slate-900 sm:text-4xl">Editais e Avisos</h1>
+    <section className="notices-background min-h-[60vh] px-4 py-10 sm:px-6 sm:py-16" aria-labelledby="notices-title">
+      <div className="mx-auto max-w-5xl space-y-5 rounded-3xl border border-slate-200 bg-surface p-5 shadow-lg sm:p-10">
+      <h1 id="notices-title" className="text-3xl font-extrabold text-slate-900 sm:text-4xl">Editais e Avisos</h1>
       {error && <p role="alert">{error}</p>}
       {!error && rows === null && <p role="status">Carregando documentos…</p>}
-      {!error && rows?.length === 0 && <p>Nenhum documento publicado.</p>}
+      {!error && rows?.length === 0 && <p className="rounded-2xl border border-dashed border-slate-300 bg-slate-100/50 p-5 text-slate-600">Nenhum edital ou aviso publicado.</p>}
       {!!rows?.length && <ul className="space-y-3">
         {rows.map(doc => <li key={doc.id} className="rounded-2xl border border-slate-200 bg-surface">
           {doc.url ? <a href={doc.url} target="_blank" rel="noopener noreferrer"
             className="flex items-center gap-3 rounded-2xl p-4 font-semibold text-indigo-700 hover:bg-indigo-50">
-            <FileText aria-hidden="true" className="h-5 w-5 shrink-0" />
+            {doc.file_path ? <FileText aria-hidden="true" className="h-5 w-5 shrink-0" /> :
+              <Link2 aria-hidden="true" className="h-5 w-5 shrink-0" />}
             <span className="min-w-0 flex-1 break-words">{doc.title}</span>
-            <span className="sr-only"> (PDF, abre em nova guia)</span>
+            <span className="sr-only"> ({doc.file_path ? 'PDF' : 'link externo'}, abre em nova guia)</span>
             <ExternalLink aria-hidden="true" className="h-4 w-4 shrink-0" />
-          </a> : <p className="break-words p-4">{doc.title} · PDF indisponível</p>}
+          </a> : <p className="break-words p-4">{doc.title} · {doc.file_path ? 'PDF indisponível' : 'Link indisponível'}</p>}
         </li>)}
       </ul>}
+      </div>
     </section>
   );
 }
 
-const emptyDraft = { title: '', position: '0', active: false };
+const emptyDraft = { title: '', position: '0', active: false, kind: 'pdf', url: '' };
 
 export function NoticesAdmin() {
   const [rows, setRows] = useState<Notice[]>([]);
@@ -102,7 +119,8 @@ export function NoticesAdmin() {
 
   function edit(row: Notice | null) {
     setEditing(row);
-    setDraft(row ? { title: row.title, position: String(row.position), active: row.active } : emptyDraft);
+    setDraft(row ? { title: row.title, position: String(row.position), active: row.active,
+      kind: row.file_path ? 'pdf' : 'link', url: row.external_url ?? '' } : emptyDraft);
     setFile(null);
     setFileKey(value => value + 1);
   }
@@ -124,8 +142,11 @@ export function NoticesAdmin() {
       if (!title || !Number.isInteger(position) || position < 0 || position > 2147483647) {
         throw new Error('Informe o texto do link e uma posição inteira válida.');
       }
-      let path = editing?.file_path;
-      if (file) {
+      const isLink = draft.kind === 'link';
+      const externalUrl = isLink ? webUrl(draft.url.trim()) : null;
+      if (isLink && !externalUrl) throw new Error('Informe um endereço válido começando com https:// ou http://.');
+      let path = isLink ? null : editing?.file_path ?? null;
+      if (!isLink && file) {
         const signature = await file.slice(0, 5).text();
         if (!/\.pdf$/i.test(file.name) || (file.type && file.type !== 'application/pdf') ||
             signature !== '%PDF-' || file.size > 10 * 1024 * 1024) {
@@ -138,8 +159,9 @@ export function NoticesAdmin() {
         const { error } = await bucket().upload(path, file, { contentType: 'application/pdf', upsert: false });
         if (error) throw error;
       }
-      if (!path) throw new Error('Selecione o arquivo PDF.');
-      const payload = { title, position, active: draft.active, file_path: path, revision: crypto.randomUUID() };
+      if (!isLink && !path) throw new Error('Selecione o arquivo PDF.');
+      const payload = { title, position, active: draft.active, file_path: path,
+        external_url: externalUrl, revision: crypto.randomUUID() };
       const operation = editing
         ? table().update(payload).eq('id', editing.id).eq('revision', editing.revision)
         : table().insert(payload);
@@ -147,7 +169,7 @@ export function NoticesAdmin() {
       if (error) throw error;
       if (!data) throw new Error('O documento foi alterado em outra sessão. Reabra o item antes de salvar.');
       stagedPath = undefined;
-      const removed = !editing || editing.file_path === path || await cleanup(editing.file_path);
+      const removed = !editing?.file_path || editing.file_path === path || await cleanup(editing.file_path);
       edit(null);
       setMessage(removed ? 'Documento salvo.' : 'Documento salvo. O PDF anterior precisa ser removido no Storage.');
     } catch (error) {
@@ -168,7 +190,7 @@ export function NoticesAdmin() {
       if (error) throw error;
       if (!data) throw new Error('O documento foi alterado em outra sessão.');
       if (editing?.id === row.id) edit(null);
-      setMessage(await cleanup(row.file_path) ? 'Documento excluído.' :
+      setMessage(!row.file_path || await cleanup(row.file_path) ? 'Item excluído.' :
         'Documento excluído da lista. Remova o PDF restante no Storage.');
     } catch (error) {
       setMessage('Não foi possível confirmar a exclusão. ' + (error as Error).message);
@@ -183,7 +205,16 @@ export function NoticesAdmin() {
     {message && <p role="status">{message}</p>}
     <form onSubmit={save} className="rounded-xl border p-4">
       <fieldset disabled={busy} className="space-y-3">
-        <legend className="font-semibold">{editing ? 'Editar documento' : 'Adicionar documento'}</legend>
+        <legend className="font-semibold">{editing ? 'Editar item' : 'Adicionar PDF ou link'}</legend>
+        <label className="block">Tipo de publicação
+          <select className={field} value={draft.kind} onChange={e => {
+            setFile(null);
+            setDraft({ ...draft, kind: e.target.value });
+          }}>
+            <option value="pdf">Arquivo PDF</option>
+            <option value="link">Link externo</option>
+          </select>
+        </label>
         <label className="block">Texto do link
           <input required maxLength={200} className={field} value={draft.title}
             onChange={e => setDraft({ ...draft, title: e.target.value })} />
@@ -192,16 +223,19 @@ export function NoticesAdmin() {
           <input type="number" required min={0} max={2147483647} className={field} value={draft.position}
             onChange={e => setDraft({ ...draft, position: e.target.value })} />
         </label>
-        <label className="block">{editing ? 'Substituir PDF (opcional)' : 'Arquivo PDF'} · até 10 MB
-          <input key={fileKey} type="file" accept=".pdf,application/pdf" required={!editing} className={field}
+        {draft.kind === 'link' ? <label className="block">Endereço do link
+          <input type="url" required maxLength={2048} className={field} value={draft.url}
+            placeholder="https://…" onChange={e => setDraft({ ...draft, url: e.target.value })} />
+        </label> : <label className="block">{editing?.file_path ? 'Substituir PDF (opcional)' : 'Arquivo PDF'} · até 10 MB
+          <input key={fileKey} type="file" accept=".pdf,application/pdf" required={!editing?.file_path} className={field}
             onChange={e => setFile(e.target.files?.[0] ?? null)} />
-        </label>
+        </label>}
         <label className="flex items-center gap-2">
           <input type="checkbox" checked={draft.active} onChange={e => setDraft({ ...draft, active: e.target.checked })} />
           Publicar na página
         </label>
         <div className="flex flex-wrap gap-2">
-          <button type="submit" className="rounded-xl bg-indigo-700 px-4 py-2 text-white">Salvar documento</button>
+          <button type="submit" className="rounded-xl bg-indigo-700 px-4 py-2 text-white">Salvar item</button>
           {editing && <button type="button" className={button} onClick={() => edit(null)}>Cancelar edição</button>}
         </div>
       </fieldset>

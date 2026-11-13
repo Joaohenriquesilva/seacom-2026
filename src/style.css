@@ -35,7 +35,16 @@ body{background:rgb(var(--seacom-background));color:rgb(var(--seacom-text));}
 .identity-hero h1{color:rgb(var(--seacom-heroText));}
 .identity-gradient-brand{background-image:var(--seacom-gradient-brand);}
 .identity-gradient-title{background-image:var(--seacom-gradient-title);}
+.notices-background {
+  background-image: radial-gradient(ellipse at top, rgb(var(--seacom-indigo500) / .10), transparent 72%);
+}
 @media (prefers-reduced-motion: no-preference) {
+  .cover-enter :is(.cover-badge, .cover-subtitle, .cover-actions, .cover-panorama) {
+    animation: cover-letter-enter 620ms cubic-bezier(.2,.65,.3,1) both;
+  }
+  .cover-enter .cover-subtitle { animation-delay: 140ms; }
+  .cover-enter .cover-actions { animation-delay: 260ms; }
+  .cover-enter .cover-panorama { animation-delay: 330ms; }
   .cover-letter {
     display: inline-block;
     animation: cover-letter-enter 580ms cubic-bezier(.2,.65,.3,1) both;

@@ -1503,11 +1503,11 @@ export default function App() {
           <div>
             {homeSections.filter(section => section.visible !== false).map(section => {
               if (section.type === 'hero') return <React.Fragment key={section.id}>
-            <section className="identity-hero relative overflow-hidden bg-slate-950 text-white py-16 lg:py-24" style={siteConfig.coverUrl ? {backgroundImage:`url(${siteConfig.coverUrl})`,backgroundPosition:"center",backgroundSize:"cover"} : undefined}>
+            <section className={`identity-hero relative overflow-hidden bg-slate-950 text-white py-16 lg:py-24 ${animateCover ? 'cover-enter' : ''}`} style={siteConfig.coverUrl ? {backgroundImage:`url(${siteConfig.coverUrl})`,backgroundPosition:"center",backgroundSize:"cover"} : undefined}>
               <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="grid lg:grid-cols-12 gap-12 items-center">
                   <div className="lg:col-span-7 space-y-6">
-                    <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-indigo-500/15 border border-indigo-400/30 text-indigo-300 text-xs font-semibold">
+                    <div className="cover-badge inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-indigo-500/15 border border-indigo-400/30 text-indigo-300 text-xs font-semibold">
                       <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
                       <span>{siteConfig.heroBadge}</span>
                     </div>
@@ -1532,10 +1532,10 @@ export default function App() {
                         })() : siteConfig.heroTitle}
                       </span>
                     </h1>
-                    <p className="text-slate-300 text-base sm:text-lg leading-relaxed max-w-2xl">
+                    <p className="cover-subtitle text-slate-300 text-base sm:text-lg leading-relaxed max-w-2xl">
                       {siteConfig.heroSubtitle}
                     </p>
-                    <div className="flex flex-wrap items-center gap-4 pt-3">
+                    <div className="cover-actions flex flex-wrap items-center gap-4 pt-3">
                       <button
                         onClick={() => setActiveTab('register')}
                         className="px-6 py-3.5 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-sm shadow-lg shadow-indigo-600/30 flex items-center gap-2 transition"
@@ -1553,7 +1553,7 @@ export default function App() {
                     </div>
                   </div>
 
-                  <div className="lg:col-span-5">
+                  <div className="cover-panorama lg:col-span-5">
                     <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-6">
                       <div className="flex items-center justify-between border-b border-slate-800 pb-4">
                         <div>

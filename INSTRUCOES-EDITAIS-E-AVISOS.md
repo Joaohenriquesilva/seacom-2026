@@ -3,7 +3,7 @@
 ## 1. Aplicar a atualização no Supabase
 
 1. Abra o projeto Supabase já usado pelo site. Vá a **SQL Editor → New query**.
-2. Cole todo o conteúdo de `SQL-EDITAIS-E-AVISOS.sql` e clique em **Run**. Em um site já configurado, esse é o único script novo. Ele usa a função de permissões `public.seacom_can(text)` já instalada e pode ser executado novamente.
+2. Se o módulo ainda não estiver instalado, execute `SQL-EDITAIS-E-AVISOS.sql` usando **Run**. Depois execute `SQL-EDITAIS-LINKS.sql` em uma nova consulta. Se os editais já estiverem instalados, execute somente `SQL-EDITAIS-LINKS.sql`. Ambos podem ser executados novamente.
 3. Em **Table Editor**, confira a tabela `seacom_notices` e o RLS ativo. Em **Storage**, confirme que o bucket `seacom-notices` é privado, aceita `application/pdf` e tem limite de 10 MB por arquivo.
 4. A administração principal e os organizadores com **Notícias → Publicar** podem gerenciar os documentos. O acesso individual pode ser ajustado em **Organizadores e acessos → Editar acessos**. Essa permissão também controla a publicação de notícias.
 
@@ -16,7 +16,7 @@
 
 ## 3. Usar e conferir
 
-1. Entre no painel e abra **Editais e Avisos**. Informe o texto do link, a posição e o PDF. O menor número aparece primeiro. Em empate, o título define a ordem.
+1. Entre no painel e abra **Editais e Avisos**. Escolha **Arquivo PDF** ou **Link externo**, informe o título e a posição e selecione o arquivo ou cole o endereço com `https://` ou `http://`. O menor número aparece primeiro. Em empate, o título define a ordem.
 2. Marque **Publicar na página** para exibir o documento. Para alterar título, ordem ou visibilidade, clique em **Editar**. Para trocar o PDF, selecione um novo arquivo durante a edição. **Excluir** pede confirmação.
 3. Em uma janela anônima, confira a aba ao lado de **Inscrição**, abra um PDF em outra guia e verifique a ordem dos links. Desative um documento e recarregue a página pública para confirmar que ele sumiu. Links assinados já emitidos podem continuar funcionando por até 15 minutos após a desativação.
 4. Confira a capa ao abrir o site e teste a preferência de movimento reduzido do sistema. Faça também uma conferência das cores, inscrições, notícias, mídias, login e check-in por localização na publicação.
