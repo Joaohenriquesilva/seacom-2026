@@ -1422,15 +1422,15 @@ export default function App() {
 
       {/* HEADER */}
       <header className="sticky top-0 z-40 bg-surface/90 backdrop-blur-md border-b border-slate-200/80">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 min-h-20 py-3 flex flex-wrap items-center justify-between gap-4">
+        <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 min-h-20 py-3 flex flex-wrap xl:flex-nowrap items-center justify-between gap-3">
           <button
             onClick={() => setActiveTab('home')}
-            className="flex items-center gap-3 text-left group focus:outline-none"
+            className="flex min-w-0 items-center gap-3 text-left group focus:outline-none"
           >
             <div className="rounded-2xl identity-gradient-brand flex items-center justify-center text-white shadow-md shadow-indigo-500/20 group-hover:scale-105 transition shrink-0 overflow-hidden" style={{width:siteConfig.headerLogoSize||44,height:siteConfig.headerLogoSize||44}}>
               {siteConfig.headerLogoUrl ? <img src={siteConfig.headerLogoUrl} alt="Logomarca do evento" className="w-full h-full object-contain" /> : <Radio className="w-6 h-6" />}
             </div>
-            <div>
+            <div className="min-w-0">
               <div className="flex items-center gap-2">
                 <span className="text-xl font-extrabold tracking-tight text-slate-900">
                   {siteConfig.acronym}
@@ -1443,7 +1443,7 @@ export default function App() {
             </div>
           </button>
 
-          <nav aria-label="Menu principal" className="order-last w-full xl:order-none xl:w-auto flex items-center gap-1 overflow-x-auto bg-slate-100/80 p-1.5 rounded-2xl border border-slate-200/60">
+          <nav aria-label="Menu principal" className="order-last w-full xl:order-none xl:w-auto min-w-0 flex items-center gap-1 overflow-x-auto bg-slate-100/80 p-1.5 rounded-2xl border border-slate-200/60">
             {[
               { id: 'home', label: 'Início', icon: Sparkles },
               { id: 'schedule', label: 'Programação', icon: Calendar, badge: activities.length },
@@ -1460,7 +1460,7 @@ export default function App() {
                   type="button"
                   aria-current={isActive ? 'page' : undefined}
                   onClick={() => setActiveTab(item.id)}
-                  className={`flex shrink-0 items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-600 ${
+                  className={`flex shrink-0 items-center gap-2 whitespace-nowrap px-3 py-2 2xl:px-4 rounded-xl text-sm font-semibold transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-600 ${
                     isActive ? 'bg-surface text-indigo-700 shadow-sm' : 'text-slate-600 hover:text-slate-900 hover:bg-surface/50'
                   }`}
                 >
@@ -1471,7 +1471,7 @@ export default function App() {
             })}
           </nav>
 
-          <div className="flex items-center gap-2.5">
+          <div className="flex shrink-0 items-center gap-2.5 whitespace-nowrap">
             <button
               onClick={() => setActiveTab('register')}
               className="hidden sm:inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm shadow-indigo-500/20 transition"

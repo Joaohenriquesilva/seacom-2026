@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import React, { useEffect, useState, type FormEvent } from 'react';
 import { ExternalLink, FileText } from 'lucide-react';
 import { supabase } from './lib/supabase';
 
@@ -29,7 +29,10 @@ export function PublicNotices() {
         if (error) throw error;
         const documents = (data ?? []) as Notice[];
         if (!documents.length) {
-          if (current) setRows([]);
+          if (current) {
+            setRows([]);
+            setError('');
+          }
           return;
         }
         const { data: signed, error: signError } = await bucket().createSignedUrls(
