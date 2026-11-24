@@ -322,7 +322,7 @@ export default function App() {
         const { supabase } = await import('./lib/supabase');
         const { data, error } = await supabase
           .from('activities')
-          .select('id,title,description,activity_type,starts_at,ends_at,location,capacity')
+          .select('id,title,description,activity_type,starts_at,ends_at,location,capacity,speaker:speakers!speaker_id(name,bio)')
           .eq('is_published', true)
           .order('starts_at', { ascending: true });
         if (error) throw error;
@@ -339,7 +339,7 @@ export default function App() {
           const dataFim = new Date(item.ends_at);
           const dateParts = Object.fromEntries(formatDate.formatToParts(dataInicio).map((part) => [part.type, part.value]));
           const isoDate = `${dateParts.year}-${dateParts.month}-${dateParts.day}`;
-          const speaker = null; // Consulta pública simplificada, sem dependência da relação speakers
+          const speaker = item.speaker;
           const horas = Math.max(0, (dataFim.getTime() - dataInicio.getTime()) / 3600000);
           return {
             id: item.id, type: tipos[item.activity_type] || 'Outro',
