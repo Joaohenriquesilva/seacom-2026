@@ -290,6 +290,16 @@ export default function App() {
     setContentRevision(v => v + 1);
     window.scrollTo({top: 0, behavior: 'instant'});
   };
+  const reloadSection = (page: string) => {
+    setMobileMenuOpen(false);
+    if (page === activeTab || !validPages.includes(page)) return;
+    const destination = new URL(window.location.href);
+    destination.searchParams.delete('admin');
+    destination.hash = '/' + page;
+    // A troca de hash sozinha não carrega um novo documento.
+    window.history.pushState({page}, '', destination);
+    window.location.reload();
+  };
   const openArticle = (id) => {
     window.history.pushState({page:'article'}, '', `${window.location.pathname}${window.location.search}#/article/${encodeURIComponent(id)}`);
     setArticleId(id); setActiveTabState('article'); setContentRevision(v=>v+1);
@@ -298,10 +308,20 @@ export default function App() {
   useEffect(() => {
     const onHistory = () => { setMobileMenuOpen(false); setActiveTabState(getPageFromUrl()); setArticleId(decodeURIComponent(window.location.hash.match(/^#\/article\/(.+)$/)?.[1] || '')); setContentRevision(v => v + 1); };
     const onUpdated = () => setContentRevision(v => v + 1);
+    const onVisible = () => { if (!document.hidden) onUpdated(); };
+    const onPageShow = (event: PageTransitionEvent) => { if (event.persisted) onUpdated(); };
     window.addEventListener('popstate', onHistory);
     window.addEventListener('hashchange', onHistory);
     window.addEventListener('seacom:content-updated', onUpdated);
-    return () => { window.removeEventListener('popstate', onHistory); window.removeEventListener('hashchange', onHistory); window.removeEventListener('seacom:content-updated', onUpdated); };
+    window.addEventListener('pageshow', onPageShow);
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      window.removeEventListener('popstate', onHistory);
+      window.removeEventListener('hashchange', onHistory);
+      window.removeEventListener('seacom:content-updated', onUpdated);
+      window.removeEventListener('pageshow', onPageShow);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
   }, []);
 
   const [siteConfig, setSiteConfig] = useState(INITIAL_SITE_CONFIG);
@@ -362,7 +382,11 @@ export default function App() {
           }))
         }));
         setActivities(registros);
-        setRegForm((prev) => ({ ...prev, selectedActivityIds: [] }));
+        const publishedIds = new Set(registros.map(item => item.id));
+        setRegForm(prev => ({
+          ...prev,
+          selectedActivityIds: prev.selectedActivityIds.filter(id => publishedIds.has(id))
+        }));
         setProgramacaoStatus('conectado');
       } catch (err) {
         if (!ativo) return;
@@ -1420,9 +1444,6 @@ export default function App() {
                   <span>Voltar para João Henrique Silva</span>
                 </button>
               )}
-              <button onClick={() => setActiveTab('admin')} className="underline hover:text-white font-medium">
-                Painel Admin
-              </button>
               <button
                 onClick={() => {
                   setCurrentAdminId(null);
@@ -1447,7 +1468,7 @@ export default function App() {
         }}>
         <div className="relative max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 min-h-20 py-3 flex items-center justify-between gap-3">
           <button
-            onClick={() => setActiveTab('home')}
+            onClick={() => reloadSection('home')}
             className="flex min-w-0 items-center gap-3 text-left group focus:outline-none"
           >
             <div className="rounded-2xl identity-gradient-brand flex items-center justify-center text-white shadow-md shadow-indigo-500/20 group-hover:scale-105 transition shrink-0 overflow-hidden" style={{width:siteConfig.headerLogoSize||44,height:siteConfig.headerLogoSize||44}}>
@@ -1492,7 +1513,7 @@ export default function App() {
                   aria-current={isActive ? 'page' : undefined}
                   onClick={() => {
                     if (mobileMenuOpen && mobileMenuButton.current?.getClientRects().length) mobileMenuButton.current.focus();
-                    setActiveTab(item.id);
+                    reloadSection(item.id);
                   }}
                   style={{ '--menu-delay': index * 45 + 'ms' } as React.CSSProperties}
                   className={`flex min-h-11 shrink-0 items-center gap-2 whitespace-nowrap px-3 py-2 2xl:px-4 rounded-xl text-left text-sm font-semibold transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-600 xl:min-h-0 ${
@@ -1508,24 +1529,11 @@ export default function App() {
 
           <div className="hidden shrink-0 items-center gap-2.5 whitespace-nowrap xl:flex">
             <button
-              onClick={() => setActiveTab('register')}
+              onClick={() => reloadSection('register')}
               className="hidden sm:inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm shadow-indigo-500/20 transition"
             >
               <span>Inscreva-se</span>
               <ArrowRight className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => setActiveTab('admin')}
-              className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-sm font-semibold border transition ${
-                activeTab === 'admin'
-                  ? 'bg-slate-900 text-white border-slate-900'
-                  : currentAdmin
-                  ? 'bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100'
-                  : 'bg-surface text-slate-700 border-slate-200 hover:bg-slate-100'
-              }`}
-            >
-              <Shield className="w-4 h-4" />
-              <span className="hidden lg:inline">{currentAdmin ? 'Painel Admin' : 'Área Admin'}</span>
             </button>
           </div>
         </div>
@@ -1572,14 +1580,14 @@ export default function App() {
                     </p>
                     <div className="cover-actions flex flex-wrap items-center gap-4 pt-3">
                       <button
-                        onClick={() => setActiveTab('register')}
+                        onClick={() => reloadSection('register')}
                         className="px-6 py-3.5 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-sm shadow-lg shadow-indigo-600/30 flex items-center gap-2 transition"
                       >
                         <span>Fazer Minha Inscrição Agora</span>
                         <ArrowRight className="w-4 h-4" />
                       </button>
                       <button
-                        onClick={() => setActiveTab('schedule')}
+                        onClick={() => reloadSection('schedule')}
                         className="px-6 py-3.5 rounded-2xl bg-surface/10 hover:bg-surface/15 text-white font-semibold text-sm border border-white/15 flex items-center gap-2 transition"
                       >
                         <Calendar className="w-4 h-4" />
@@ -1624,9 +1632,9 @@ export default function App() {
               if (section.type === 'about') return <React.Fragment key={section.id}>
             <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14 space-y-4"><h2 className="text-3xl font-extrabold text-slate-900">Sobre a SEACOM 2026</h2><p className="max-w-3xl text-slate-600 leading-relaxed">{siteConfig.aboutText}</p><div className="grid md:grid-cols-3 gap-4 pt-4"><div className="rounded-2xl bg-surface border p-5"><strong>Programação</strong><p className="text-sm text-slate-600 mt-2">Palestras, oficinas e mesas redondas</p></div><div className="rounded-2xl bg-surface border p-5"><strong>Comunicação</strong><p className="text-sm text-slate-600 mt-2">Notícias e atualizações do evento</p></div><div className="rounded-2xl bg-surface border p-5"><strong>Participação</strong><p className="text-sm text-slate-600 mt-2">Atividades e registro de presença</p></div></div></section>
               </React.Fragment>;
-              if (section.type === 'schedule') return <section key={section.id} className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-5"><div className="flex flex-wrap items-center justify-between gap-3"><div><span className="text-xs font-bold uppercase tracking-widest text-indigo-600">SEACOM 2026</span><h2 className="text-3xl font-extrabold text-slate-900">Programação</h2></div><button type="button" onClick={() => setActiveTab('schedule')} className="rounded-xl bg-indigo-700 text-white px-5 py-3 font-semibold">Ver programação completa →</button></div><div className="grid gap-4 md:grid-cols-3">{activities.slice(0,3).map(a=><div key={a.id} className="bg-surface border border-slate-200 rounded-2xl p-5"><h3 className="font-bold text-slate-900">{a.title}</h3><p className="text-sm text-slate-600 mt-2">{a.description || 'Confira os detalhes na programação.'}</p></div>)}{activities.length===0&&<p className="text-slate-600">Programação em atualização.</p>}</div></section>;
-              if (section.type === 'news') return <section key={section.id} className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-5"><div className="flex flex-wrap items-center justify-between gap-3"><h2 className="text-3xl font-extrabold text-slate-900">Últimas notícias</h2><button type="button" onClick={() => setActiveTab('news')} className="rounded-xl bg-indigo-700 text-white px-5 py-3 font-semibold">Ver todas as notícias →</button></div><div className="grid gap-4 md:grid-cols-3">{newsList.slice(0,3).map(n=><article key={n.id} className="bg-surface border border-slate-200 rounded-2xl overflow-hidden"><img src={n.imageUrl} alt={n.title} className="w-full aspect-[4/3] object-cover"/><div className="p-5"><h3 className="font-bold text-slate-900">{n.title}</h3><p className="text-sm text-slate-600 mt-2">{n.summary}</p><button type="button" onClick={() => openArticle(n.id)} className="mt-3 text-sm font-bold text-indigo-700 hover:underline">Ler matéria completa →</button></div></article>)}{newsList.length===0&&<p className="text-slate-600">Nenhuma notícia publicada.</p>}</div></section>;
-              if (section.type === 'register') return <section key={section.id} className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12"><div className="rounded-3xl bg-indigo-950 text-white p-8 sm:p-12 flex flex-col md:flex-row gap-6 md:items-center md:justify-between"><div><h2 className="text-3xl font-extrabold">Participe da SEACOM 2026</h2><p className="text-indigo-100 mt-3">Acesse a área de inscrições para escolher suas atividades.</p></div><button type="button" onClick={() => setActiveTab('register')} className="rounded-xl bg-surface text-indigo-950 px-6 py-3 font-bold">Ir para inscrições →</button></div></section>;
+              if (section.type === 'schedule') return <section key={section.id} className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-5"><div className="flex flex-wrap items-center justify-between gap-3"><div><span className="text-xs font-bold uppercase tracking-widest text-indigo-600">SEACOM 2026</span><h2 className="text-3xl font-extrabold text-slate-900">Programação</h2></div><button type="button" onClick={() => reloadSection('schedule')} className="rounded-xl bg-indigo-700 text-white px-5 py-3 font-semibold">Ver programação completa →</button></div><div className="grid gap-4 md:grid-cols-3">{activities.slice(0,3).map(a=><div key={a.id} className="bg-surface border border-slate-200 rounded-2xl p-5"><h3 className="font-bold text-slate-900">{a.title}</h3><p className="text-sm text-slate-600 mt-2">{a.description || 'Confira os detalhes na programação.'}</p></div>)}{activities.length===0&&<p className="text-slate-600">Programação em atualização.</p>}</div></section>;
+              if (section.type === 'news') return <section key={section.id} className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-5"><div className="flex flex-wrap items-center justify-between gap-3"><h2 className="text-3xl font-extrabold text-slate-900">Últimas notícias</h2><button type="button" onClick={() => reloadSection('news')} className="rounded-xl bg-indigo-700 text-white px-5 py-3 font-semibold">Ver todas as notícias →</button></div><div className="grid gap-4 md:grid-cols-3">{newsList.slice(0,3).map(n=><article key={n.id} className="bg-surface border border-slate-200 rounded-2xl overflow-hidden"><img src={n.imageUrl} alt={n.title} className="w-full aspect-[4/3] object-cover"/><div className="p-5"><h3 className="font-bold text-slate-900">{n.title}</h3><p className="text-sm text-slate-600 mt-2">{n.summary}</p><button type="button" onClick={() => openArticle(n.id)} className="mt-3 text-sm font-bold text-indigo-700 hover:underline">Ler matéria completa →</button></div></article>)}{newsList.length===0&&<p className="text-slate-600">Nenhuma notícia publicada.</p>}</div></section>;
+              if (section.type === 'register') return <section key={section.id} className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12"><div className="rounded-3xl bg-indigo-950 text-white p-8 sm:p-12 flex flex-col md:flex-row gap-6 md:items-center md:justify-between"><div><h2 className="text-3xl font-extrabold">Participe da SEACOM 2026</h2><p className="text-indigo-100 mt-3">Acesse a área de inscrições para escolher suas atividades.</p></div><button type="button" onClick={() => reloadSection('register')} className="rounded-xl bg-surface text-indigo-950 px-6 py-3 font-bold">Ir para inscrições →</button></div></section>;
               if (section.type === 'text') return <section key={section.id} className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12"><div className="bg-surface border border-slate-200 rounded-3xl p-7 sm:p-10"><h2 className="text-2xl font-extrabold text-slate-900 mb-3">{section.title || 'Informações'}</h2><p className="whitespace-pre-line text-slate-600 leading-relaxed">{section.body || ''}</p></div></section>;
               return null;
             })}
@@ -1807,7 +1815,7 @@ export default function App() {
         {activeTab === 'article' && (() => {
           const n = newsList.find(item => String(item.id) === articleId);
           return <main className="max-w-4xl mx-auto px-4 sm:px-6 py-10 min-h-[50vh]">
-            <button type="button" onClick={() => setActiveTab('news')} className="mb-6 text-indigo-700 font-semibold hover:underline">← Voltar às notícias</button>
+            <button type="button" onClick={() => reloadSection('news')} className="mb-6 text-indigo-700 font-semibold hover:underline">← Voltar às notícias</button>
             {n ? <article className="bg-surface rounded-3xl overflow-hidden border border-slate-200 shadow-sm">
               <img src={n.imageUrl} alt={n.title} className="w-full aspect-[4/3] object-cover" />
               <div className="p-6 sm:p-10 space-y-5">
@@ -1820,7 +1828,7 @@ export default function App() {
           </main>;
         })()}
 
-        {activeTab === 'editais' && <PublicNotices />}
+        {activeTab === 'editais' && <PublicNotices revision={contentRevision} />}
         {activeTab === 'media' && (
           <section aria-labelledby="media-title" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-14">
             <h1 id="media-title" className="text-3xl sm:text-4xl font-extrabold text-slate-900">Mídias</h1>

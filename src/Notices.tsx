@@ -30,7 +30,7 @@ function webUrl(value: string) {
   }
 }
 
-export function PublicNotices() {
+export function PublicNotices({ revision = 0 }: { revision?: number }) {
   const [rows, setRows] = useState<(Notice & { url?: string })[] | null>(null);
   const [error, setError] = useState('');
 
@@ -64,13 +64,11 @@ export function PublicNotices() {
     }
     void load();
     const refresh = window.setInterval(load, 10 * 60 * 1000);
-    window.addEventListener('focus', load);
     return () => {
       current = false;
       window.clearInterval(refresh);
-      window.removeEventListener('focus', load);
     };
-  }, []);
+  }, [revision]);
 
   return (
     <section className="notices-background min-h-[60vh] px-4 py-10 sm:px-6 sm:py-16" aria-labelledby="notices-title">
