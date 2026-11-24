@@ -28,6 +28,7 @@ Depois clique **Deploy site**. Para alterações nas variáveis, faça **Trigger
 
 - Supabase → Authentication → URL Configuration: atualize **Site URL** para `https://SEU-SITE.netlify.app` e adicione o domínio em **Redirect URLs** (incluindo `https://SEU-SITE.netlify.app/**`, se apropriado ao seu fluxo).
 - Para configurar o envio de e-mails (convite de organizador e confirmação de inscrição), veja **INSTRUCOES-EMAIL.md**.
+- Para habilitar **Adicionar palestrante** em **Criar programação**, aplique `SQL-CADASTRO-PALESTRANTES.sql` no SQL Editor do Supabase antes de publicar esta versão. O formulário cadastra o nome e seleciona o palestrante na atividade. Clique em **Salvar atividade** para gravar o vínculo.
 - Se utilizar convites por Edge Function, configure o segredo `SEACOM_SITE_URL` com o domínio público do Netlify e confirme o deploy das funções Supabase. As Edge Functions **não** são publicadas automaticamente pelo Netlify.
 - Confira se as tabelas, políticas RLS, funções SQL e buckets de Storage exigidos pelos módulos já foram criados no projeto Supabase correto.
 
