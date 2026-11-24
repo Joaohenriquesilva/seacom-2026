@@ -1116,9 +1116,22 @@ export default function App() {
       const result = Array.isArray(data) ? data[0] : data;
       const protocol = typeof result === 'string' ? result : result?.protocol;
       if (!protocol) throw new Error('O banco não retornou o protocolo da inscrição. Verifique a função SQL.');
-      setCompletedRegistration({...regForm,protocol});
+      // E-mail de confirmação com a relação de atividades. Se falhar, a inscrição
+      // continua válida (já foi gravada): apenas avisamos o participante.
+      let emailSent = false;
+      try {
+        const mailResp = await fetch(`${url}/functions/v1/seacom-send-registration-email`, {
+          method:'POST',
+          headers:{'Content-Type':'application/json','Authorization':`Bearer ${authSession.access_token}`,'apikey':key},
+          body:'{}'
+        });
+        emailSent = mailResp.ok;
+      } catch { emailSent = false; }
+      setCompletedRegistration({...regForm,protocol,emailSent});
       setParticipantPassword(''); setParticipantPasswordConfirm('');
-      showToast('Inscrição confirmada e salva! Sua presença na palestra será registrada separadamente pelo QR Code. Protocolo: '+protocol);
+      showToast(emailSent
+        ? 'Inscrição confirmada! Enviamos os detalhes para o seu e-mail. Protocolo: '+protocol
+        : 'Inscrição confirmada e salva! Não conseguimos enviar o e-mail agora; guarde seu protocolo: '+protocol);
       window.dispatchEvent(new Event('seacom:content-updated'));
     } catch (err) {
       const msg = err?.message || 'Erro desconhecido';
@@ -1844,6 +1857,9 @@ export default function App() {
                       </span>
                     </div>
                     <p className="text-sm font-bold text-slate-800">Participante: {completedRegistration.name}</p>
+                    {completedRegistration.emailSent
+                      ? <p className="text-sm text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-xl p-3">Enviamos a confirmação e a lista das suas atividades para <strong>{completedRegistration.email}</strong>. Se não aparecer na caixa de entrada, confira o spam.</p>
+                      : <p className="text-sm text-amber-900 bg-amber-50 border border-amber-200 rounded-xl p-3">Sua inscrição está salva, mas não foi possível enviar o e-mail de confirmação agora. Guarde o protocolo acima.</p>}
                     <button
                       onClick={() => setCompletedRegistration(null)}
                       className="px-5 py-2.5 rounded-xl bg-indigo-600 text-white text-xs font-bold"
@@ -1903,7 +1919,7 @@ export default function App() {
                         </div>
                       </div>
                       <label className="inline-flex items-center gap-2 text-xs text-slate-700"><input type="checkbox" checked={showParticipantPassword} onChange={e=>setShowParticipantPassword(e.target.checked)}/> Mostrar senhas</label>
-                      <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-xl p-3">Ao clicar em Confirmar Inscrição, seu cadastro e sua vaga na atividade serão registrados imediatamente. O QR Code é utilizado depois, somente para registrar presença. A confirmação por e-mail está desativada durante os testes privados.</p>
+                      <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-xl p-3">Ao clicar em Confirmar Inscrição, seu cadastro e sua vaga na atividade serão registrados imediatamente. O QR Code é utilizado depois, somente para registrar presença. Você receberá por e-mail a confirmação com o protocolo e a lista das atividades escolhidas.</p>
                     </div>
 
                     <div className="space-y-4 pt-4 border-t">
