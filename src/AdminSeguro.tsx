@@ -1,3 +1,4 @@
+import LocalPresencaAdmin from './LocalPresencaAdmin';
 import { NoticesAdmin } from './Notices';
 import ModulosAdmin from './ModulosAdmin';
 import { supabase } from './lib/supabase';
@@ -69,6 +70,7 @@ export default function AdminSeguro(){
   }catch(e:any){setMessage('Exclusão: '+e.message)}finally{setBusy(false)}
  }
  async function save(){if(!editing)return;setBusy(true);setMessage('');try{const {error}=await client.rpc('seacom_update_organizer',{p_user_id:editing.user_id,p_name:editing.display_name,p_profile:editing.profile_id,p_active:editing.is_active,p_overrides:editing.overrides||{}});if(error)throw error;await refresh(client);setEditing(null);setMessage('Alterações salvas com sucesso.')}catch(e:any){setMessage(e.message)}finally{setBusy(false)}}
+ const canManageLocation=!!member?.is_active&&session?.user?.email?.toLowerCase()==='henrrique.costta@gmail.com';
  const field='border border-slate-300 rounded-xl p-2 w-full';
  return <section className="max-w-5xl mx-auto px-4 sm:px-6 py-12 min-h-[360px]"><div className="bg-surface border border-slate-200 rounded-3xl p-6 sm:p-8 space-y-5">
  <h1 className="text-2xl font-extrabold text-slate-900">Administração — SEACOM 2026</h1><p className="text-sm text-slate-600">Acesso restrito. Permissões verificadas com segurança.</p>
@@ -76,7 +78,7 @@ export default function AdminSeguro(){
  {loading?<p>Verificando acesso...</p>:!session?<form onSubmit={login} className="max-w-md space-y-3"><label className="block">E-mail<input type="email" required autoComplete="username" className={field} value={email} onChange={e=>setEmail(e.target.value)}/></label><label className="block">Senha<input type="password" required autoComplete="current-password" className={field} value={password} onChange={e=>setPassword(e.target.value)}/></label><button className="bg-indigo-700 text-white rounded-xl px-5 py-3">Entrar</button></form>:<>
  <div className="flex flex-wrap justify-between gap-3"><span>Conectado: <strong>{session.user.email}</strong></span><button type="button" className="border rounded-xl px-4 py-2" onClick={()=>client.auth.signOut()}>Sair</button></div>
  {member?<><p className="bg-indigo-50 rounded-xl p-3">Perfil: <strong>{profileNames[member.profile_id]||member.profile_id}</strong>{member.is_owner?' — Acesso principal':''}</p>
- <nav aria-label="Seções administrativas" className="flex flex-wrap gap-2 border-b border-slate-200 pb-4">{[...(member.is_owner?[['invite','Convidar organizador'],['organizers','Organizadores e acessos']]:[]),['news','Publicar notícia'],...(canPublishNotices?[['editais','Editais e Avisos']]:[]),['programming','Criar programação'],['home','Página inicial e capa'],['identity','Cores e identidade visual'],['attendance','QR Code e presenças']].map(([id,label])=><button key={id} type="button" aria-current={activeTab===id?'page':undefined} onClick={()=>{setActiveTab(id);setMessage('')}} className={'rounded-xl px-4 py-2 text-sm font-semibold transition-colors '+(activeTab===id?'bg-indigo-700 text-white shadow-sm':'border border-slate-200 bg-surface text-slate-700 hover:bg-indigo-50')}>{label}</button>)}</nav>
+ <nav aria-label="Seções administrativas" className="flex flex-wrap gap-2 border-b border-slate-200 pb-4">{[...(member.is_owner?[['invite','Convidar organizador'],['organizers','Organizadores e acessos']]:[]),['news','Publicar notícia'],...(canPublishNotices?[['editais','Editais e Avisos']]:[]),['programming','Criar programação'],['home','Página inicial e capa'],['identity','Cores e identidade visual'],['attendance','QR Code e presenças'],...(canManageLocation?[['checkin-location','Local de presença']]:[])].map(([id,label])=><button key={id} type="button" aria-current={activeTab===id?'page':undefined} onClick={()=>{setActiveTab(id);setMessage('')}} className={'rounded-xl px-4 py-2 text-sm font-semibold transition-colors '+(activeTab===id?'bg-indigo-700 text-white shadow-sm':'border border-slate-200 bg-surface text-slate-700 hover:bg-indigo-50')}>{label}</button>)}</nav>
  {member.is_owner&&activeTab==='invite'&&<div className="space-y-3"><h2 className="text-lg font-bold">Convidar organizador</h2><p className="text-sm text-slate-600">Informe o e-mail e escolha as permissões. O sistema envia o convite por e-mail; não é necessário cadastrar a pessoa manualmente.</p>
  <form onSubmit={add} className="space-y-4"><div className="grid sm:grid-cols-2 gap-3"><label>Nome<input className={field} required minLength={2} maxLength={100} value={newName} onChange={e=>setNewName(e.target.value)}/></label><label>E-mail do convidado<input className={field} type="email" required value={newEmail} onChange={e=>setNewEmail(e.target.value)}/></label><label>Perfil padrão<select className={field} value={newProfile} onChange={e=>setNewProfile(e.target.value)}>{Object.entries(profileNames).filter(([k])=>k!=='owner').map(([k,v])=><option key={k} value={k}>{v}</option>)}</select></label></div>
  <p className="text-sm text-slate-600">Permissões individuais: Padrão segue o perfil selecionado; Permitir ou Bloquear substitui o perfil.</p>
@@ -90,6 +92,7 @@ export default function AdminSeguro(){
  <div className="flex gap-3"><button type="button" disabled={busy} className="bg-indigo-700 text-white rounded-xl px-5 py-3" onClick={save}>Salvar permissões</button><button type="button" className="border rounded-xl px-5 py-3" onClick={()=>setEditing(null)}>Cancelar</button></div></div>}
  </>}
  {canPublishNotices&&activeTab==='editais'&&<NoticesAdmin />}
+ {canManageLocation&&activeTab==='checkin-location'&&<LocalPresencaAdmin />}
  <ModulosAdmin isOwner={member.is_owner} activeTab={activeTab}/><p className="text-sm text-slate-600">As inscrições públicas ainda são demonstrativas; o credenciamento exige inscrições reais confirmadas.</p></>:<p>Aguardando confirmação das permissões...</p>}</>}
  </div></section>
 }

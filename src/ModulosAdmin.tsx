@@ -92,7 +92,50 @@ export default function ModulosAdmin({isOwner,activeTab}:{isOwner:boolean,active
  }
  useEffect(()=>{if(activeTab!=='attendance'||!activity)return;void loadEnrollments();},[activeTab,activity]);
  async function makeQR(){if(!activity)return;const link=window.location.origin+window.location.pathname+'?checkin='+encodeURIComponent(activity);try{const qrcode=await import('qrcode');setQr(await qrcode.toDataURL(link,{width:360,margin:2}));}catch(e:any){setMessage('QR Code: '+e.message)}}
- async function exportExcel(){if(!sb||!activity)return;setBusy(true);try{const {data,error}=await sb.rpc('seacom_attendance_report',{p_activity_id:activity});if(error)throw error;const ExcelJS=(await import('exceljs')).default;const wb=new ExcelJS.Workbook(),ws=wb.addWorksheet('Presenças');ws.columns=[{header:'Nome',key:'nome',width:36},{header:'E-mail',key:'email',width:38},{header:'Atividade',key:'atividade',width:42},{header:'Confirmado em (UTC)',key:'confirmado_em',width:27}];(data||[]).forEach((x:any)=>ws.addRow(x));ws.getRow(1).font={bold:true,color:{argb:'FFFFFFFF'}};ws.getRow(1).fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF3730A3'}};ws.autoFilter={from:'A1',to:'D1'};const bytes=await wb.xlsx.writeBuffer();const blob=new Blob([bytes],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});const u=URL.createObjectURL(blob),a=document.createElement('a');a.href=u;a.download=`seacom-presencas-${activity}.xlsx`;a.click();URL.revokeObjectURL(u);setMessage(`${data?.length||0} presenças exportadas.`)}catch(e:any){setMessage(e.message)}finally{setBusy(false)}}
+ async function exportExcel() {
+  if(!sb||!activity||busy)return;
+  setBusy(true);
+  setMessage('');
+  try {
+   const ExcelJS=(await import('exceljs')).default;
+   const wb=new ExcelJS.Workbook();
+   const ws=wb.addWorksheet('Presenças');
+   ws.columns=[
+    {header:'Nome',key:'nome',width:36},
+    {header:'E-mail',key:'email',width:38},
+    {header:'Telefone',key:'telefone',width:22,style:{numFmt:'@'}},
+    {header:'Atividade',key:'atividade',width:42},
+    {header:'Status da presença',key:'status_presenca',width:29},
+    {header:'Confirmado em (UTC)',key:'confirmado_em',width:27},
+   ];
+   const pageSize=500;
+   let count=0;
+   while(true) {
+    const {data,error}=await sb.rpc('seacom_attendance_export',{p_activity_id:activity}).range(count,count+pageSize-1);
+    if(error)throw error;
+    const rows=data||[];
+    ws.addRows(rows);
+    count+=rows.length;
+    if(rows.length<pageSize)break;
+   }
+   ws.getRow(1).font={bold:true,color:{argb:'FFFFFFFF'}};
+   ws.getRow(1).fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF3730A3'}};
+   ws.autoFilter={from:'A1',to:'F1'};
+   const bytes=await wb.xlsx.writeBuffer();
+   const blob=new Blob([bytes],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+   const url=URL.createObjectURL(blob);
+   const link=document.createElement('a');
+   link.href=url;
+   link.download='seacom-presencas-'+activity+'.xlsx';
+   link.click();
+   URL.revokeObjectURL(url);
+   setMessage(count+' inscrições exportadas.');
+  } catch(error) {
+   setMessage((error as Error).message);
+  } finally {
+   setBusy(false);
+  }
+ }
  const input='w-full border rounded-lg p-2',btn='bg-indigo-700 text-white rounded-lg px-4 py-2 disabled:opacity-50';
  return <div className="space-y-6 mt-5">{message&&<p role="alert" className="p-3 rounded-lg bg-amber-50 text-amber-900">{message}</p>}
  {activeTab==='identity'&&(isOwner||rights['site.editar'])&&<IdentityEditor/>}

@@ -48,3 +48,12 @@ Crie um `.env.local` com os valores reais (use `.env.example` como modelo). Esse
 - **Dependências:** o arquivo package-lock.json acompanha esta atualização. Use npm ci para instalar as versões fixadas.
 - **Compilação:** npm run build e os sete testes de identidade visual passaram nesta atualização. Consulte VALIDACAO-DA-ENTREGA.md para os limites da validação.
 - Não coloque chave `service_role`, senha de administrador ou outros segredos em variáveis `VITE_`: elas ficam públicas no JavaScript do navegador.
+
+### Locais de confirmação e planilha de presenças
+
+1. No SQL Editor do projeto Supabase, execute `SQL-LOCAL-E-EXPORTACAO-PRESENCAS.sql`. A migração usa as tabelas da configuração de presença anterior e conserva o ponto e a tolerância já cadastrados.
+2. Crie uma chave de geocodificação no [Geoapify](https://apidocs.geoapify.com/docs/geocoding/forward-geocoding/) e salve-a em **Edge Functions → Secrets** como `GEOAPIFY_API_KEY`. O endereço digitado é enviado ao Geoapify somente quando o administrador clica em **Buscar endereço**.
+3. Publique a função com `supabase functions deploy seacom-find-checkin-address` e publique esta versão do site.
+4. Entre com `henrrique.costta@gmail.com` e abra **Local de presença**. Selecione o padrão do evento ou uma atividade já cadastrada, busque o endereço, confira o ponto no mapa e clique em **Salvar local**. A opção **Voltar a usar o local padrão** remove o local específico da atividade.
+
+Em **QR Code e presenças**, a exportação por atividade inclui inscrições não canceladas, com telefone, status da presença e data de confirmação quando houver.
