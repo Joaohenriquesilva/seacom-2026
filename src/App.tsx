@@ -1,3 +1,4 @@
+import ConsultarInscricao from './ConsultarInscricao';
 import { displayTime } from './lib/displayTime';
 import {scheduleDefaults,typeLabel,compareSchedule} from './lib/scheduleConfig';
 import {newsToHtml} from './lib/newsRichText';
@@ -240,22 +241,6 @@ const syncModulePermissions = (perms) => {
 
 const INITIAL_ADMINS = []; // Contas administrativas são gerenciadas no Supabase Auth.
 
-const INITIAL_REGISTRATIONS = [
-  {
-    id: 'reg-101',
-    protocol: 'SEACOM-2026-8491',
-    name: 'Mariana Costa Oliveira',
-    email: 'mariana.oliveira@aluno.edu.br',
-    cpfOrId: '202310459',
-    course: '',
-    period: '5º Período',
-    phone: '(68) 99912-3456',
-    institution: '',
-    selectedActivityIds: ['act-1', 'act-3'],
-    createdAt: '05/11/2026 às 14h20'
-  }
-];
-
 // ============================================================================
 // COMPONENTE PRINCIPAL
 // ============================================================================
@@ -428,7 +413,6 @@ export default function App() {
   }, [contentRevision, activeTab]);
 
   const [admins, setAdmins] = useState(INITIAL_ADMINS);
-  const [registrations, setRegistrations] = useState(INITIAL_REGISTRATIONS);
 
   const [currentAdminId, setCurrentAdminId] = useState(null);
   const [loginUsername, setLoginUsername] = useState('');
@@ -464,9 +448,6 @@ export default function App() {
   const [showParticipantPassword, setShowParticipantPassword] = useState(false);
   const [completedRegistration, setCompletedRegistration] = useState(null);
   const [registrationBusy, setRegistrationBusy] = useState(false);
-  const [lookupQuery, setLookupQuery] = useState('');
-  const [lookupResult, setLookupResult] = useState(null);
-  const [lookupAttempted, setLookupAttempted] = useState(false);
 
   const [toast, setToast] = useState(null);
   const [confirmModal, setConfirmModal] = useState(null);
@@ -1030,29 +1011,6 @@ export default function App() {
     });
   };
 
-  const handleDeleteRegistration = (reg) => {
-    if (!hasPermission('inscritos_excluir')) {
-      showToast('Seu usuário não tem permissão para remover inscrições.', 'error');
-      return;
-    }
-    setConfirmModal({
-      title: 'Cancelar Inscrição',
-      message: `Deseja cancelar a inscrição de ${reg.name} (${reg.protocol})?`,
-      onConfirm: () => {
-        setRegistrations((prev) => prev.filter((r) => r.id !== reg.id));
-        setActivities((prev) =>
-          prev.map((act) =>
-            reg.selectedActivityIds.includes(act.id) && act.enrolledCount > 0
-              ? { ...act, enrolledCount: act.enrolledCount - 1 }
-              : act
-          )
-        );
-        setConfirmModal(null);
-        showToast('Inscrição cancelada.');
-      }
-    });
-  };
-
   const handleToggleActivitySelection = (actId) => {
     setRegForm((prev) => {
       const exists = prev.selectedActivityIds.includes(actId);
@@ -1167,20 +1125,6 @@ export default function App() {
       const msg = err?.message || 'Erro desconhecido';
       showToast('Não foi possível concluir a inscrição: '+msg, 'error');
     } finally { setRegistrationBusy(false); }
-  };
-
-  const handleLookupRegistration = (e) => {
-    e.preventDefault();
-    const q = lookupQuery.trim().toLowerCase();
-    if (!q) return;
-    const found = registrations.find(
-      (r) =>
-        r.protocol.toLowerCase() === q ||
-        r.email.toLowerCase() === q ||
-        r.cpfOrId.toLowerCase() === q
-    );
-    setLookupResult(found || null);
-    setLookupAttempted(true);
   };
 
   return (
@@ -1983,27 +1927,7 @@ export default function App() {
               </div>
 
               <div className="lg:col-span-4">
-                <div className="bg-surface rounded-3xl border p-6 shadow-sm space-y-4">
-                  <h3 className="text-sm font-extrabold text-slate-900">Consultar Inscrição</h3>
-                  <form onSubmit={handleLookupRegistration} className="space-y-2.5">
-                    <input
-                      type="text"
-                      value={lookupQuery}
-                      onChange={(e) => setLookupQuery(e.target.value)}
-                      placeholder="Protocolo ou e-mail..."
-                      className="w-full px-3.5 py-2.5 rounded-xl border text-xs"
-                    />
-                    <button type="submit" className="w-full py-2.5 rounded-xl bg-slate-900 text-white text-xs font-bold">
-                      Buscar
-                    </button>
-                  </form>
-                  {lookupAttempted && lookupResult && (
-                    <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-xs">
-                      <p className="font-bold text-emerald-900">{lookupResult.name}</p>
-                      <p className="font-mono font-bold text-emerald-800">{lookupResult.protocol}</p>
-                    </div>
-                  )}
-                </div>
+                <ConsultarInscricao />
               </div>
             </div>
           </div>
