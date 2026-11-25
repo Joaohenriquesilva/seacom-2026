@@ -3,6 +3,7 @@ import React,{useEffect,useState} from 'react';
 import EditorNoticia from './EditorNoticia';
 import ProgramacaoAdmin from './ProgramacaoAdmin';
 import {newsPlainText} from './lib/newsRichText';
+import {buildActivityWorkbook} from './lib/activityWorkbook';
 import {supabase} from './lib/supabase';
 const url=import.meta.env.VITE_SUPABASE_URL,key=import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 const sb=url&&key?supabase:null;
@@ -18,13 +19,17 @@ export default function ModulosAdmin({isOwner,activeTab}:{isOwner:boolean,active
  const [uploading,setUploading]=useState<'news'|'cover'|'favicon'|'logo'|null>(null);
  const [activities,setActivities]=useState<any[]>([]),[activity,setActivity]=useState(''),[qr,setQr]=useState(''),[message,setMessage]=useState(''),[busy,setBusy]=useState(false);
  const [enrollments,setEnrollments]=useState<any[]>([]),[enrollLoading,setEnrollLoading]=useState(false),[enrollError,setEnrollError]=useState('');
+ const [enrollmentRefresh,setEnrollmentRefresh]=useState(0);
+ const [activityError,setActivityError]=useState('');
+ const [activitiesLoading,setActivitiesLoading]=useState(false);
+ const [qrLoading,setQrLoading]=useState(false);
  const permissions=['noticias.visualizar','noticias.criar','noticias.editar','noticias.excluir','noticias.publicar','site.editar','inscricoes.exportar','credenciamento.visualizar'];
  useEffect(()=>{if(!sb)return;(async()=>{
   const results=await Promise.all(permissions.map(async p=>{const {data}=await sb.rpc('seacom_can',{p_permission:p});return [p,!!data] as const}));
   setRights(Object.fromEntries(results));
-  const [n,s,a]=await Promise.all([sb.from('seacom_news').select('*').order('created_at',{ascending:false}),sb.from('seacom_site_content').select('*').eq('id',1).single(),sb.from('activities').select('id,title,starts_at').eq('is_published',true).order('starts_at')]);
+  const [n,s]=await Promise.all([sb.from('seacom_news').select('*').order('created_at',{ascending:false}),sb.from('seacom_site_content').select('*').eq('id',1).single()]);
   if(n.error)setMessage('Não foi possível carregar as notícias: '+n.error.message);else setNews(n.data||[]);
-  if(s.data){const {visual_theme,...content}=s.data;setSite({...content,home_sections:Array.isArray(s.data.home_sections)?s.data.home_sections:defaultSections,favicon_url:s.data.favicon_url||'',header_logo_url:s.data.header_logo_url||'',header_name:s.data.header_name??'SEACOM',header_subtitle:s.data.header_subtitle??'Semana Acadêmica de Comunicação',header_edition:s.data.header_edition??'XIII EDIÇÃO • 2026',header_show_edition:s.data.header_show_edition!==false,header_logo_size:s.data.header_logo_size??44});}if(a.data){setActivities(a.data);if(a.data.length)setActivity(a.data[0].id)}
+  if(s.data){const {visual_theme,...content}=s.data;setSite({...content,home_sections:Array.isArray(s.data.home_sections)?s.data.home_sections:defaultSections,favicon_url:s.data.favicon_url||'',header_logo_url:s.data.header_logo_url||'',header_name:s.data.header_name??'SEACOM',header_subtitle:s.data.header_subtitle??'Semana Acadêmica de Comunicação',header_edition:s.data.header_edition??'XIII EDIÇÃO • 2026',header_show_edition:s.data.header_show_edition!==false,header_logo_size:s.data.header_logo_size??44});}
  })()},[]);
  async function uploadImage(file:File,kind:'news'|'cover'|'favicon'|'logo'){
   if(!sb)return;
@@ -81,58 +86,81 @@ export default function ModulosAdmin({isOwner,activeTab}:{isOwner:boolean,active
  }
  function moveSection(index:number,direction:number){const next=[...site.home_sections];const target=index+direction;if(target<0||target>=next.length)return;[next[index],next[target]]=[next[target],next[index]];changeSections(next)}
  async function saveSite(){if(!sb)return;setBusy(true);const {error}=await sb.from('seacom_site_content').update({...site,updated_at:new Date().toISOString()}).eq('id',1);setMessage(error?'Erro ao salvar a página inicial: '+error.message:'Página inicial salva com sucesso. A página pública será atualizada automaticamente.');if(!error){setSectionNotice('');window.dispatchEvent(new Event('seacom:content-updated'));}setBusy(false)}
- async function loadEnrollments(){
-  if(!sb||!activity){setEnrollments([]);return;}
-  setEnrollLoading(true);setEnrollError('');
-  try{
-   const {data,error}=await sb.rpc('seacom_activity_enrollments',{p_activity_id:activity});
-   if(error)throw error;
-   setEnrollments(data||[]);
-  }catch(e:any){setEnrollError(e?.message||String(e));setEnrollments([])}finally{setEnrollLoading(false)}
+ useEffect(()=>{
+  if(!sb||activeTab!=='attendance')return;
+  let current=true;
+  setActivitiesLoading(true);
+  setActivityError('');
+  void (async()=>{
+   try {
+    const {data,error}=await sb.from('activities').select('id,title,starts_at')
+     .eq('is_published',true).order('starts_at').order('id');
+    if(error)throw error;
+    if(!current)return;
+    const available=data||[];
+    setActivities(available);
+    if(!available.some(item=>item.id===activity)){
+     setActivity('');setQr('');setEnrollments([]);
+    }
+   }catch(e:any){
+    if(current)setActivityError(e.message);
+   }finally{
+    if(current)setActivitiesLoading(false);
+   }
+  })();
+  return ()=>{current=false;};
+ },[activeTab]);
+ useEffect(()=>{
+  if(!sb||activeTab!=='attendance'||!activity)return;
+  let current=true;
+  setEnrollLoading(true);
+  setEnrollError('');
+  void (async()=>{
+   try {
+    const {data,error}=await sb.rpc('seacom_activity_enrollments',{p_activity_id:activity});
+    if(error)throw error;
+    if(current)setEnrollments(data||[]);
+   }catch(e:any){
+    if(current){setEnrollError(e.message);setEnrollments([]);}
+   }finally{
+    if(current)setEnrollLoading(false);
+   }
+  })();
+  return ()=>{current=false;};
+ },[activeTab,activity,enrollmentRefresh]);
+ async function makeQR(){
+  if(!activity||qrLoading)return;
+  setQrLoading(true);
+  const link=window.location.origin+window.location.pathname+'?checkin='+encodeURIComponent(activity);
+  try {
+   const qrcode=await import('qrcode');
+   setQr(await qrcode.toDataURL(link,{width:360,margin:2}));
+  }catch(e:any){setMessage('QR Code: '+e.message)}
+  finally{setQrLoading(false);}
  }
- useEffect(()=>{if(activeTab!=='attendance'||!activity)return;void loadEnrollments();},[activeTab,activity]);
- async function makeQR(){if(!activity)return;const link=window.location.origin+window.location.pathname+'?checkin='+encodeURIComponent(activity);try{const qrcode=await import('qrcode');setQr(await qrcode.toDataURL(link,{width:360,margin:2}));}catch(e:any){setMessage('QR Code: '+e.message)}}
- async function exportExcel() {
-  if(!sb||!activity||busy)return;
+ async function exportExcel(kind:'inscritos'|'presencas') {
+  const selected=activities.find(item=>item.id===activity);
+  if(!sb||!selected||busy)return;
   setBusy(true);
   setMessage('');
   try {
-   const ExcelJS=(await import('exceljs')).default;
-   const wb=new ExcelJS.Workbook();
-   const ws=wb.addWorksheet('Presenças');
-   ws.columns=[
-    {header:'Nome',key:'nome',width:36},
-    {header:'E-mail',key:'email',width:38},
-    {header:'Telefone',key:'telefone',width:22,style:{numFmt:'@'}},
-    {header:'Atividade',key:'atividade',width:42},
-    {header:'Status da presença',key:'status_presenca',width:29},
-    {header:'Confirmado em (UTC)',key:'confirmado_em',width:27},
-   ];
-   const pageSize=500;
-   let count=0;
-   while(true) {
-    const {data,error}=await sb.rpc('seacom_attendance_export',{p_activity_id:activity}).range(count,count+pageSize-1);
+   const {bytes,count}=await buildActivityWorkbook(kind,selected.title,async(offset,end)=>{
+    const {data,error}=await sb.rpc('seacom_attendance_export',{p_activity_id:selected.id}).range(offset,end);
     if(error)throw error;
-    const rows=data||[];
-    ws.addRows(rows);
-    count+=rows.length;
-    if(rows.length<pageSize)break;
-   }
-   ws.getRow(1).font={bold:true,color:{argb:'FFFFFFFF'}};
-   ws.getRow(1).fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF3730A3'}};
-   ws.autoFilter={from:'A1',to:'F1'};
-   const bytes=await wb.xlsx.writeBuffer();
-   const blob=new Blob([bytes],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
-   const url=URL.createObjectURL(blob);
+    return data||[];
+   });
+   const fileUrl=URL.createObjectURL(new Blob([bytes],{
+    type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+   }));
    const link=document.createElement('a');
-   link.href=url;
-   link.download='seacom-presencas-'+activity+'.xlsx';
+   link.href=fileUrl;
+   link.download='seacom-'+kind+'-'+selected.id+'.xlsx';
    link.click();
-   URL.revokeObjectURL(url);
-   setMessage(count+' inscrições exportadas.');
-  } catch(error) {
-   setMessage((error as Error).message);
-  } finally {
+   window.setTimeout(()=>URL.revokeObjectURL(fileUrl),1000);
+   setMessage(count ? count+' inscrições exportadas para '+selected.title+'.' : 'Planilha sem registros para '+selected.title+'.');
+  }catch(error){
+   setMessage('Não foi possível exportar: '+(error as Error).message);
+  }finally{
    setBusy(false);
   }
  }
@@ -144,12 +172,27 @@ export default function ModulosAdmin({isOwner,activeTab}:{isOwner:boolean,active
  {activeTab==='news'&&(isOwner||rights['noticias.visualizar']||rights['noticias.criar']||rights['noticias.editar'])&&<section className="space-y-3"><h3 className="text-lg font-semibold">Notícias e comunicados</h3>{(isOwner||rights['noticias.criar']||rights['noticias.editar'])&&<div className="space-y-2 border rounded-xl p-4"><input className={input} placeholder="Título da notícia" value={draft.title} onChange={e=>setDraft({...draft,title:e.target.value})}/><input className={input} placeholder="Resumo" value={draft.summary} onChange={e=>setDraft({...draft,summary:e.target.value})}/><label className="block text-sm font-medium">Imagem de capa da notícia — proporção 4:3 (JPG, PNG ou WebP, até 5 MB)<input type="file" accept="image/jpeg,image/png,image/webp" className={input} disabled={!!uploading} onChange={e=>{const file=e.target.files?.[0];if(file)void uploadImage(file,'news');e.currentTarget.value='';}}/></label>{uploading==='news'&&<p role="status">Enviando imagem...</p>}{draft.image_url&&<img src={draft.image_url} alt="Prévia da capa da notícia em proporção 4:3" className="w-full max-w-md aspect-[4/3] rounded-xl object-cover"/>}<EditorNoticia onUploadImage={uploadInlineNewsImage} resetKey={draft.id||"nova-noticia"} value={draft.body} onChange={body=>setDraft(old=>({...old,body}))}/><label className="flex gap-2"><input type="checkbox" checked={draft.published} disabled={!isOwner&&!rights['noticias.publicar']} onChange={e=>setDraft({...draft,published:e.target.checked})}/> Publicar no site</label><button type="button" className={btn} disabled={busy||!!uploading||(!isOwner&&!(draft.id?rights['noticias.editar']:rights['noticias.criar']))} onClick={saveNews}>Salvar notícia</button>{draft.id&&<button type="button" className="ml-2 border rounded-lg px-4 py-2" onClick={()=>setDraft(blank)}>Cancelar edição</button>}</div>}
  {news.map(n=><div key={n.id} className="border rounded-xl p-3 flex justify-between gap-3"><div><strong>{n.title}</strong><p className="text-xs text-slate-500">{n.published?'Publicada':'Rascunho'}</p></div><div className="flex gap-2">{(isOwner||rights['noticias.editar'])&&<button type="button" className="border rounded-lg px-3" onClick={()=>setDraft(n)}>Editar</button>}{(isOwner||rights['noticias.excluir'])&&<button type="button" className="border border-red-300 text-red-700 rounded-lg px-3" onClick={()=>removeNews(n.id)}>Excluir</button>}</div></div>)}</section>}
  {activeTab==='home'&&(isOwner||rights['site.editar'])&&<section className="space-y-3"><h3 className="text-lg font-semibold">Página inicial e capa</h3><p className="text-sm text-slate-600">Envie uma imagem do seu computador. A imagem ficará disponível publicamente no site.</p>{([['hero_badge','Selo da capa'],['hero_title','Título principal'],['hero_subtitle','Subtítulo'],['about_text','Sobre o evento']] as const).map(([k,label])=><label key={k} className="block text-sm">{label}<textarea rows={k==='about_text'?3:1} className={input} value={site[k]} onChange={e=>setSite({...site,[k]:e.target.value})}/></label>)}<label className="block text-sm font-medium">Imagem de capa (JPG, PNG ou WebP, até 5 MB)<input type="file" accept="image/jpeg,image/png,image/webp" className={input} disabled={!!uploading} onChange={e=>{const file=e.target.files?.[0];if(file)void uploadImage(file,'cover');e.currentTarget.value='';}}/></label>{uploading==='cover'&&<p role="status">Enviando capa...</p>}{site.cover_url&&<img alt="Prévia da capa" src={site.cover_url} className="max-h-48 rounded-xl object-cover"/>}<div className="border rounded-xl p-4 space-y-2"><h4 className="font-bold">Ícone da aba do navegador (favicon)</h4><p className="text-sm text-slate-600">Envie uma imagem quadrada, de preferência PNG 512 × 512 pixels. Clique em Salvar alterações para aplicar.</p><input type="file" accept="image/png,image/jpeg,image/webp" aria-label="Enviar ícone da página" disabled={!!uploading} onChange={e=>{const file=e.target.files?.[0];if(file)void uploadImage(file,'favicon');e.currentTarget.value='';}}/>{uploading==='favicon'&&<p role="status">Enviando ícone...</p>}{site.favicon_url&&<img src={site.favicon_url} alt="Prévia do ícone do site" className="w-16 h-16 object-contain rounded border"/>}</div><div className="border rounded-xl p-4 space-y-3"><div><h4 className="font-bold">Identidade do cabeçalho (parte superior do site)</h4><p className="text-sm text-slate-600">Personalize a logomarca, o nome, o subtítulo e o selo que aparecem no menu superior. Salve as alterações da página inicial para publicar.</p></div><label className="block text-sm">Nome principal<input className={input} value={site.header_name??''} onChange={e=>setSite(old=>({...old,header_name:e.target.value}))} placeholder="SEACOM"/></label><label className="block text-sm">Subtítulo<input className={input} value={site.header_subtitle??''} onChange={e=>setSite(old=>({...old,header_subtitle:e.target.value}))} placeholder="Semana Acadêmica de Comunicação"/></label><label className="block text-sm">Texto do selo da edição<input className={input} value={site.header_edition??''} onChange={e=>setSite(old=>({...old,header_edition:e.target.value}))} placeholder="XIII EDIÇÃO • 2026"/></label><label className="flex gap-2 items-center text-sm"><input type="checkbox" checked={site.header_show_edition!==false} onChange={e=>setSite(old=>({...old,header_show_edition:e.target.checked}))}/>Mostrar selo da edição</label><label className="block text-sm font-medium">Enviar logomarca (PNG, JPG ou WebP, até 5 MB)<input type="file" accept="image/png,image/jpeg,image/webp" className={input} disabled={!!uploading} onChange={e=>{const file=e.target.files?.[0];if(file)void uploadImage(file,'logo');e.currentTarget.value='';}}/></label>{uploading==='logo'&&<p role="status">Enviando logomarca...</p>}{site.header_logo_url&&<div className="flex items-center gap-3"><img src={site.header_logo_url} alt="Prévia da logomarca" className="w-16 h-16 rounded-lg object-contain border"/><button type="button" className="border rounded-lg px-3 py-2 text-sm" onClick={()=>setSite(old=>({...old,header_logo_url:''}))}>Usar ícone original</button></div>}<label className="block text-sm">Tamanho da logomarca: {site.header_logo_size??44} px<input type="range" min="32" max="80" step="2" className="w-full" value={site.header_logo_size??44} onChange={e=>setSite(old=>({...old,header_logo_size:Number(e.target.value)}))}/></label><div className="border rounded-xl p-3 bg-surface flex items-center gap-3"><div className="rounded-xl bg-indigo-600 flex items-center justify-center text-white font-bold shrink-0 overflow-hidden" style={{width:site.header_logo_size??44,height:site.header_logo_size??44}}>{site.header_logo_url?<img src={site.header_logo_url} alt="" className="w-full h-full object-contain"/>:'◉'}</div><div className="min-w-0"><div className="flex items-center gap-2 flex-wrap"><strong className="text-xl">{site.header_name||'SEACOM'}</strong>{site.header_show_edition!==false&&site.header_edition&&<span className="text-xs bg-indigo-50 text-indigo-700 px-2 py-1 rounded">{site.header_edition}</span>}</div><p className="text-xs text-slate-500">{site.header_subtitle}</p></div></div></div><div className="border rounded-xl p-4 space-y-3"><div><h4 className="font-bold">Organizar seções da página inicial</h4><p className="text-sm text-slate-600">Use as setas para mudar a ordem, marque as seções visíveis e adicione blocos de informações. As alterações só aparecem no site depois de salvar.</p></div>{site.home_sections.map((section,index)=><div key={section.id} className="border rounded-lg p-3 space-y-2"><div className="flex flex-wrap items-center justify-between gap-2"><label className="flex items-center gap-2 text-sm font-semibold"><input type="checkbox" checked={section.visible!==false} onChange={e=>changeSections(site.home_sections.map((x,i)=>i===index?{...x,visible:e.target.checked}:x))}/>{section.type==='hero'?'Capa principal':section.type==='about'?'Sobre a SEACOM':section.type==='schedule'?'Programação':section.type==='news'?'Notícias':section.type==='register'?'Inscrições':section.title||'Bloco de informações'}</label><div className="flex gap-2"><button type="button" className="border rounded-lg px-3 py-1 disabled:opacity-40" disabled={index===0} onClick={()=>moveSection(index,-1)} aria-label="Mover seção para cima">↑</button><button type="button" className="border rounded-lg px-3 py-1 disabled:opacity-40" disabled={index===site.home_sections.length-1} onClick={()=>moveSection(index,1)} aria-label="Mover seção para baixo">↓</button>{!['hero','about'].includes(section.type)&&<button type="button" className="border border-red-300 text-red-700 rounded-lg px-3 py-1" onClick={()=>changeSections(site.home_sections.filter(x=>x.id!==section.id))}>Remover</button>}</div></div>{section.type==='text'&&<><input className={input} aria-label="Título do bloco" placeholder="Título do bloco" value={section.title||''} onChange={e=>changeSections(site.home_sections.map((x,i)=>i===index?{...x,title:e.target.value}:x))}/><textarea className={input} rows={3} aria-label="Texto do bloco" placeholder="Conteúdo do bloco" value={section.body||''} onChange={e=>changeSections(site.home_sections.map((x,i)=>i===index?{...x,body:e.target.value}:x))}/></>}</div>)}<button type="button" className="border border-indigo-300 text-indigo-700 rounded-lg px-4 py-2" onClick={()=>changeSections([...site.home_sections,{id:crypto.randomUUID(),type:'text',visible:true,title:'Nova seção',body:''}])}>+ Adicionar seção de texto</button><div className="flex flex-wrap gap-2 pt-2">{([['schedule','Programação'],['news','Notícias'],['register','Inscrições']] as const).map(([type,label])=><button key={type} type="button" className="border border-indigo-300 text-indigo-700 rounded-lg px-4 py-2 disabled:opacity-40" onClick={()=>addHomeSection(type)}>{site.home_sections.some(s=>s.type===type&&s.visible!==false)?'✓ '+label+' já está na página':site.home_sections.some(s=>s.type===type)?'+ Mostrar '+label:'+ Adicionar '+label}</button>)}</div><p role="status" className="text-sm text-indigo-700" aria-live="polite">{sectionNotice}</p><p className="text-xs text-slate-500">Os blocos mostram uma prévia e um botão para abrir a aba completa. Você pode reorganizar, ocultar ou remover cada bloco.</p></div><button type="button" className={btn} disabled={busy||!!uploading} onClick={saveSite}>Salvar alterações da página inicial</button></section>}
- {activeTab==='attendance'&&(isOwner||rights['inscricoes.exportar']||rights['credenciamento.visualizar'])&&<section className="space-y-3"><h3 className="text-lg font-semibold">QR Code e lista de presença</h3><p className="text-sm text-slate-600">O QR Code abre a confirmação autenticada. Somente participantes com inscrição confirmada e conta Auth com o mesmo e-mail poderão registrar presença, próximo ao horário da atividade.</p><select className={input} value={activity} onChange={e=>{setActivity(e.target.value);setQr('');setEnrollments([])}}>{activities.map(a=><option key={a.id} value={a.id}>{a.title}</option>)}</select><div className="flex flex-wrap gap-2"><button type="button" className={btn} onClick={makeQR}>Gerar QR Code</button>{(isOwner||rights['inscricoes.exportar'])&&<button type="button" className={btn} disabled={busy} onClick={exportExcel}>Exportar presenças (.xlsx)</button>}</div>{qr&&<div className="space-y-2"><img src={qr} alt="QR Code da atividade selecionada" className="w-64 h-64"/><a href={qr} download={`seacom-qr-${activity}.png`} className="underline text-indigo-700">Baixar QR Code PNG</a></div>}
- <div className="border rounded-xl p-4 space-y-3"><div className="flex flex-wrap justify-between items-center gap-2"><h4 className="font-bold">Participantes inscritos nesta atividade ({enrollments.length})</h4><button type="button" className="border rounded-lg px-3 py-2 disabled:opacity-50" onClick={loadEnrollments} disabled={enrollLoading}>{enrollLoading?'Atualizando...':'Atualizar lista'}</button></div>
+ {activeTab==='attendance'&&(isOwner||rights['inscricoes.exportar']||rights['credenciamento.visualizar'])&&<section className="space-y-3"><h3 className="text-lg font-semibold">QR Code e lista de presença</h3><p className="text-sm text-slate-600">O QR Code abre a confirmação autenticada. Somente participantes com inscrição confirmada e conta Auth com o mesmo e-mail poderão registrar presença, próximo ao horário da atividade.</p><label className="block text-sm font-medium">Evento ou atividade
+ <select className={input} value={activity} disabled={busy||qrLoading||activitiesLoading||!!activityError||!activities.length} onChange={e=>{
+  setActivity(e.target.value);setQr('');setEnrollments([]);setEnrollError('');setMessage('');
+ }}>
+  <option value="">{activitiesLoading?'Carregando atividades…':activities.length?'Selecione uma atividade':'Nenhuma atividade publicada'}</option>
+  {activities.map(a=><option key={a.id} value={a.id}>{a.title}{a.starts_at?' · '+new Date(a.starts_at).toLocaleString('pt-BR',{timeZone:'America/Rio_Branco',dateStyle:'short',timeStyle:'short'}):''}{activities.some(other=>other.id!==a.id&&other.title===a.title&&other.starts_at===a.starts_at)?' · '+a.id:''}</option>)}
+ </select></label>
+ {activityError&&<p role="alert">Não foi possível carregar as atividades. {activityError}</p>}
+ <div className="flex flex-wrap gap-2">
+  <button type="button" className={btn} disabled={!activity||qrLoading||activitiesLoading||!!activityError} onClick={makeQR}>Gerar QR Code</button>
+  {(isOwner||rights['inscricoes.exportar'])&&<>
+   <button type="button" className={btn} disabled={!activity||busy||activitiesLoading||!!activityError} onClick={()=>void exportExcel('presencas')}>Exportar presenças (.xlsx)</button>
+   <button type="button" className={btn} disabled={!activity||busy||activitiesLoading||!!activityError} onClick={()=>void exportExcel('inscritos')}>Exportar lista de inscritos (.xlsx)</button>
+   <p className="basis-full text-sm text-slate-600">Para imprimir a lista de inscritos, abra a planilha exportada no Excel e selecione Arquivo → Imprimir.</p>
+  </>}
+ </div>{qr&&<div className="space-y-2"><img src={qr} alt="QR Code da atividade selecionada" className="w-64 h-64"/><a href={qr} download={`seacom-qr-${activity}.png`} className="underline text-indigo-700">Baixar QR Code PNG</a></div>}
+ {activity&&<div className="border rounded-xl p-4 space-y-3"><div className="flex flex-wrap justify-between items-center gap-2"><h4 className="font-bold">Participantes inscritos nesta atividade ({enrollments.length})</h4><button type="button" className="border rounded-lg px-3 py-2 disabled:opacity-50" onClick={()=>setEnrollmentRefresh(value=>value+1)} disabled={enrollLoading}>{enrollLoading?'Atualizando...':'Atualizar lista'}</button></div>
  <p className="text-sm text-slate-600">Inscrição e presença são etapas diferentes. A presença só fica confirmada depois que o participante usa o QR Code no horário permitido.</p>
  {enrollError&&<p role="alert" className="text-red-700 text-sm">Não foi possível consultar inscritos: {enrollError}.</p>}
  {!enrollLoading&&!enrollError&&enrollments.length===0&&<p className="text-sm text-slate-500">Nenhuma inscrição encontrada para esta atividade.</p>}
- {enrollments.length>0&&<div className="overflow-x-auto"><table className="w-full text-sm text-left"><thead><tr className="border-b"><th className="p-2">Nome</th><th className="p-2">E-mail</th><th className="p-2">Inscrição</th><th className="p-2">Presença</th></tr></thead><tbody>{enrollments.map((r:any)=><tr key={r.registration_id} className="border-b"><td className="p-2">{r.nome}</td><td className="p-2">{r.email}</td><td className="p-2">{r.status_inscricao}</td><td className="p-2">{r.confirmado_em?'Confirmada':'Pendente'}</td></tr>)}</tbody></table></div>}</div></section>}
+ {enrollments.length>0&&<div className="overflow-x-auto"><table className="w-full text-sm text-left"><thead><tr className="border-b"><th className="p-2">Nome</th><th className="p-2">E-mail</th><th className="p-2">Inscrição</th><th className="p-2">Presença</th></tr></thead><tbody>{enrollments.map((r:any)=><tr key={r.registration_id} className="border-b"><td className="p-2">{r.nome}</td><td className="p-2">{r.email}</td><td className="p-2">{r.status_inscricao}</td><td className="p-2">{r.confirmado_em?'Confirmada':'Pendente'}</td></tr>)}</tbody></table></div>}</div>}</section>}
  {['news','home','attendance'].includes(activeTab)&&!isOwner&&((activeTab==='news'&&!rights['noticias.visualizar']&&!rights['noticias.criar']&&!rights['noticias.editar'])||(activeTab==='home'&&!rights['site.editar'])||(activeTab==='attendance'&&!rights['inscricoes.exportar']&&!rights['credenciamento.visualizar']))&&<p className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">Você não tem permissão para acessar esta seção. Solicite acesso à administração principal.</p>}
  </div>
 }

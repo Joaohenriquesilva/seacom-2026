@@ -1,3 +1,4 @@
+import ScheduleSettings from './ScheduleSettings';
 import React,{useEffect,useState} from 'react';
 import {supabase} from './lib/supabase';
 
@@ -54,6 +55,7 @@ export default function ProgramacaoAdmin({isOwner}:{isOwner:boolean}){
  if(loading)return <p>Carregando programação...</p>;
  if(!can('visualizar')&&!can('criar')&&!can('editar'))return <p className="rounded-xl bg-slate-50 p-4">Você não tem permissão para gerenciar a programação.</p>;
  return <section className="space-y-5"><h2 className="text-xl font-bold">Criar programação</h2><p className="text-sm text-slate-600">Cadastre palestras, oficinas e outras atividades. Apenas as atividades publicadas aparecem no site.</p>{message&&<p role="status" className="rounded-lg bg-indigo-50 p-3 text-sm">{message}</p>}
+ {can('editar')&&<ScheduleSettings items={items}/>}
  {(can('criar')||can('editar'))&&<form onSubmit={save} className="space-y-3 rounded-xl border p-4"><h3 className="font-semibold">{form.id?'Editar atividade':'Nova atividade'}</h3><label className="block text-sm">Título *<input required className={field} value={form.title} onChange={e=>setForm({...form,title:e.target.value})}/></label><label className="block text-sm">Descrição<textarea rows={3} className={field} value={form.description} onChange={e=>setForm({...form,description:e.target.value})}/></label><div className="grid gap-3 sm:grid-cols-2"><label className="block text-sm">Tipo de atividade<select className={field} value={form.activity_type} onChange={e=>setForm({...form,activity_type:e.target.value})}>{kinds.map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></label><div><label className="block text-sm">Palestrante (opcional)<select className={field} value={form.speaker_id} onChange={e=>setForm({...form,speaker_id:e.target.value})}><option value="">Não informado</option>{speakers.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
  {canCreateSpeaker&&<div className="mt-2 space-y-2">
   <label className="block text-sm">Nome do novo palestrante

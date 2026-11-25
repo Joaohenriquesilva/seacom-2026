@@ -1,3 +1,4 @@
+import {scheduleDefaults,typeLabel,compareSchedule} from './lib/scheduleConfig';
 import {newsToHtml} from './lib/newsRichText';
 import AdminSeguro from './AdminSeguro';
 import { PublicNotices } from './Notices';
@@ -324,6 +325,10 @@ export default function App() {
     };
   }, []);
 
+  const [scheduleLabels,setScheduleLabels]=useState(scheduleDefaults);
+  const [scheduleDayLabels,setScheduleDayLabels]=useState<Record<string,string>>({});
+  const [scheduleOrder,setScheduleOrder]=useState<Record<string,string[]>>({});
+  useEffect(()=>{let live=true;(async()=>{try{const {supabase}=await import('./lib/supabase');const {data}=await supabase.from('seacom_schedule_config').select('labels,day_labels,activity_order').eq('id',1).maybeSingle();if(live&&data){setScheduleLabels({...scheduleDefaults,...data.labels});setScheduleDayLabels(data.day_labels||{});setScheduleOrder(data.activity_order||{});}}catch(e){console.warn('Personalização da programação indisponível',e)}})();return()=>{live=false}},[contentRevision,activeTab]);
   const [siteConfig, setSiteConfig] = useState(INITIAL_SITE_CONFIG);
   const [activities, setActivities] = useState(INITIAL_ACTIVITIES);
   const [programacaoStatus, setProgramacaoStatus] = useState('carregando');
@@ -710,9 +715,9 @@ export default function App() {
       })
       .sort((a, b) => {
         if (a.isoDate !== b.isoDate) return (a.isoDate || '').localeCompare(b.isoDate || '');
-        return a.startTime.localeCompare(b.startTime);
+        return compareSchedule(a,b,scheduleOrder[a.isoDate]||[],a.startTime.localeCompare(b.startTime)||a.id.localeCompare(b.id));
       });
-  }, [activities, selectedDayFilter, selectedTypeFilter, scheduleSearch]);
+  }, [activities, selectedDayFilter, selectedTypeFilter, scheduleSearch,scheduleOrder]);
 
   const handleAdminLogin = (e) => {
     e.preventDefault();
@@ -1498,7 +1503,7 @@ export default function App() {
             className={`${mobileMenuOpen ? 'mobile-navigation flex' : 'hidden'} absolute inset-x-4 top-full mt-2 max-h-[65dvh] flex-col gap-1 overflow-y-auto rounded-2xl border border-slate-200 bg-surface p-2 shadow-lg sm:inset-x-6 xl:static xl:mt-0 xl:flex xl:max-h-none xl:min-w-0 xl:flex-row xl:items-center xl:overflow-x-auto xl:bg-slate-100/80 xl:p-1.5 xl:shadow-none`}>
             {[
               { id: 'home', label: 'Início', icon: Sparkles },
-              { id: 'schedule', label: 'Programação', icon: Calendar, badge: activities.length },
+              { id: 'schedule', label: scheduleLabels.menu, icon: Calendar, badge: activities.length },
               { id: 'news', label: 'Notícias', icon: Newspaper, badge: newsList.length },
               { id: 'media', label: 'Mídias', icon: FolderOpen },
               { id: 'register', label: 'Inscrição', icon: UserCheck },
@@ -1646,13 +1651,13 @@ export default function App() {
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
             <div className="identity-gradient-banner rounded-3xl p-6 sm:p-10 text-white mb-8 shadow-lg">
               <span className="text-xs font-bold uppercase tracking-wider text-indigo-300 bg-indigo-500/20 px-3 py-1 rounded-full">
-                Cronograma Oficial • {siteConfig.acronym}
+                {scheduleLabels.badge || `Cronograma Oficial • ${siteConfig.acronym}`}
               </span>
-              <h1 className="text-2xl sm:text-4xl font-extrabold mt-3">Programação de Painéis e Mesas Redondas</h1>
+              <h1 className="text-2xl sm:text-4xl font-extrabold mt-3">{scheduleLabels.title}</h1>
               <p className="mt-3 text-sm text-indigo-100" role="status">
                 {programacaoStatus === 'carregando' && 'Carregando programação...'}
                 {programacaoStatus === 'sem-configuracao' && `Programação indisponível no momento.`}
-                {programacaoStatus === 'conectado' && (activities.length ? 'Programação atualizada.' : 'Nenhuma atividade publicada no momento.')}
+                {programacaoStatus === 'conectado' && (activities.length ? scheduleLabels.subtitle : 'Nenhuma atividade publicada no momento.')}
                 {programacaoStatus === 'erro' && `Não foi possível carregar a programação. Tente novamente mais tarde.`}
               </p>
               <div className="mt-6 flex flex-wrap gap-2.5">
@@ -1664,7 +1669,7 @@ export default function App() {
                       : 'bg-surface/10 text-white border-white/15'
                   }`}
                 >
-                  Todos os Dias ({activities.length})
+                  {scheduleLabels.allDays} ({activities.length})
                 </button>
                 {siteConfig.days.map((day) => {
                   const isSelected = selectedDayFilter === day.id;
@@ -1679,7 +1684,7 @@ export default function App() {
                       }`}
                     >
                       <span className="text-xs sm:text-sm font-bold block">
-                        {day.label} — {day.date}
+                        {scheduleDayLabels[day.isoDate]?.trim() || day.label} — {day.date}
                       </span>
                     </button>
                   );
@@ -1689,7 +1694,7 @@ export default function App() {
 
             <div className="bg-surface rounded-2xl p-4 border border-slate-200/80 shadow-sm mb-8 flex flex-col md:flex-row justify-between gap-4">
               <div className="flex flex-wrap items-center gap-2">
-                {['all', 'Painel', 'Mesa Redonda', 'Oficina'].map((type) => (
+                {['all', 'Painel', 'Mesa Redonda', 'Oficina', ...(activities.some(a=>a.type==='Outro')?['Outro']:[])].map((type) => (
                   <button
                     key={type}
                     onClick={() => setSelectedTypeFilter(type)}
@@ -1697,7 +1702,7 @@ export default function App() {
                       selectedTypeFilter === type ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600'
                     }`}
                   >
-                    {type === 'all' ? 'Todos os Formatos' : type}
+                    {type === 'all' ? scheduleLabels.allTypes : typeLabel(type,scheduleLabels)}
                   </button>
                 ))}
               </div>
@@ -1707,7 +1712,7 @@ export default function App() {
                   type="text"
                   value={scheduleSearch}
                   onChange={(e) => setScheduleSearch(e.target.value)}
-                  placeholder="Buscar por tema ou palestrante..."
+                  placeholder={scheduleLabels.search}
                   className="w-full pl-10 pr-4 py-2 rounded-xl border border-slate-200 text-sm"
                 />
               </div>
@@ -1723,10 +1728,10 @@ export default function App() {
                       <div className="space-y-3 flex-1">
                         <div className="flex flex-wrap items-center gap-2.5">
                           <span className={`text-xs font-bold px-3 py-1 rounded-full border ${getBadgeStyle(act.type)}`}>
-                            {act.type}
+                            {typeLabel(act.type,scheduleLabels)}
                           </span>
                           <span className="text-xs font-bold px-3 py-1 rounded-full bg-slate-100 text-slate-800">
-                            {day.displayLabel} — {day.date || act.date}
+                            {scheduleDayLabels[act.isoDate]?.trim() || day.displayLabel} — {day.date || act.date}
                           </span>
                           <span className="text-xs font-bold px-3 py-1 rounded-full bg-indigo-50 text-indigo-700">
                             {act.startTime} às {act.endTime}
@@ -1734,7 +1739,7 @@ export default function App() {
                         </div>
                         <h3 className="text-xl font-extrabold text-slate-900">{act.title}</h3>
                         <p className="text-sm text-slate-600">{act.description}</p>
-                        <p className="text-xs font-bold text-indigo-900">Palestrantes: {act.speakers}</p>
+                        <p className="text-xs font-bold text-indigo-900">{scheduleLabels.speaker}: {act.speakers}</p>
                       </div>
                       <div className="lg:w-72 shrink-0 bg-slate-50 rounded-2xl p-5 border flex flex-col justify-between space-y-4">
                         <span className="text-xs text-slate-700 block font-semibold">{act.location}</span>
@@ -1955,7 +1960,7 @@ export default function App() {
                               </div>
                               <div>
                                 <span className="text-[11px] font-bold text-indigo-700">
-                                  {act.type} • {day.label} ({day.date})
+                                  {typeLabel(act.type,scheduleLabels)} • {scheduleDayLabels[act.isoDate]?.trim() || day.label} ({day.date})
                                 </span>
                                 <h3 className="text-sm font-bold text-slate-900">{act.title}</h3>
                               </div>
