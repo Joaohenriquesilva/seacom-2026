@@ -1,3 +1,4 @@
+import { displayTime } from './lib/displayTime';
 import {scheduleDefaults,typeLabel,compareSchedule} from './lib/scheduleConfig';
 import {newsToHtml} from './lib/newsRichText';
 import AdminSeguro from './AdminSeguro';
@@ -251,7 +252,7 @@ const INITIAL_REGISTRATIONS = [
     phone: '(68) 99912-3456',
     institution: '',
     selectedActivityIds: ['act-1', 'act-3'],
-    createdAt: '05/11/2026 às 14:20'
+    createdAt: '05/11/2026 às 14h20'
   }
 ];
 
@@ -1734,7 +1735,7 @@ export default function App() {
                             {scheduleDayLabels[act.isoDate]?.trim() || day.displayLabel} — {day.date || act.date}
                           </span>
                           <span className="text-xs font-bold px-3 py-1 rounded-full bg-indigo-50 text-indigo-700">
-                            {act.startTime} às {act.endTime}
+                            {displayTime(act.startTime)} às {displayTime(act.endTime)}
                           </span>
                         </div>
                         <h3 className="text-xl font-extrabold text-slate-900">{act.title}</h3>

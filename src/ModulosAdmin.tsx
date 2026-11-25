@@ -1,3 +1,4 @@
+import { displayTime } from './lib/displayTime';
 import IdentityEditor from './IdentityEditor';
 import React,{useEffect,useState} from 'react';
 import EditorNoticia from './EditorNoticia';
@@ -177,7 +178,7 @@ export default function ModulosAdmin({isOwner,activeTab}:{isOwner:boolean,active
   setActivity(e.target.value);setQr('');setEnrollments([]);setEnrollError('');setMessage('');
  }}>
   <option value="">{activitiesLoading?'Carregando atividades…':activities.length?'Selecione uma atividade':'Nenhuma atividade publicada'}</option>
-  {activities.map(a=><option key={a.id} value={a.id}>{a.title}{a.starts_at?' · '+new Date(a.starts_at).toLocaleString('pt-BR',{timeZone:'America/Rio_Branco',dateStyle:'short',timeStyle:'short'}):''}{activities.some(other=>other.id!==a.id&&other.title===a.title&&other.starts_at===a.starts_at)?' · '+a.id:''}</option>)}
+  {activities.map(a=><option key={a.id} value={a.id}>{a.title}{a.starts_at?' · '+displayTime(new Date(a.starts_at).toLocaleString('pt-BR',{timeZone:'America/Rio_Branco',dateStyle:'short',timeStyle:'short'})):''}{activities.some(other=>other.id!==a.id&&other.title===a.title&&other.starts_at===a.starts_at)?' · '+a.id:''}</option>)}
  </select></label>
  {activityError&&<p role="alert">Não foi possível carregar as atividades. {activityError}</p>}
  <div className="flex flex-wrap gap-2">

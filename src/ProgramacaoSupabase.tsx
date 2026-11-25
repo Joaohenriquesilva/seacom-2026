@@ -1,3 +1,4 @@
+import { displayTime } from './lib/displayTime';
 
 import { useEffect, useState } from 'react'
 import { supabase } from './lib/supabase'
@@ -68,10 +69,10 @@ export default function ProgramacaoSupabase() {
 
           <p>
             Data e horário:{' '}
-            {new Date(atividade.starts_at).toLocaleString(
+            {displayTime(new Date(atividade.starts_at).toLocaleString(
               'pt-BR',
-              { timeZone: 'America/Rio_Branco' }
-            )}
+              { timeZone: 'America/Rio_Branco', dateStyle: 'short', timeStyle: 'short' }
+            ))}
           </p>
 
           <p>Local: {atividade.location ?? 'A definir'}</p>
