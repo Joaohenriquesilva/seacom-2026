@@ -1908,6 +1908,9 @@ export default function App() {
                                   {typeLabel(act.type,scheduleLabels)} • {scheduleDayLabels[act.isoDate]?.trim() || day.label} ({day.date})
                                 </span>
                                 <h3 className="text-sm font-bold text-slate-900">{act.title}</h3>
+                                <p className="mt-1 break-words text-xs text-slate-600">
+                                  <span className="font-semibold">Local:</span> {act.location?.trim() || 'Local a definir'}
+                                </p>
                               </div>
                             </div>
                           );
