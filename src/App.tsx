@@ -246,7 +246,7 @@ const INITIAL_ADMINS = []; // Contas administrativas são gerenciadas no Supabas
 // ============================================================================
 
 export default function App() {
-  const validPages = ['home', 'schedule', 'news', 'media', 'register', 'editais', 'admin', 'article'];
+  const validPages = ['home', 'schedule', 'news', 'media', 'register', 'consultar-inscricao', 'editais', 'admin', 'article'];
   const getPageFromUrl = () => {
     const hash = window.location.hash.replace(/^#\/?/, '');
     if (hash.startsWith('article/')) return 'article';
@@ -1805,7 +1805,8 @@ export default function App() {
         {activeTab === 'register' && (
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
             <div className="grid lg:grid-cols-12 gap-8">
-              <div className="lg:col-span-8">
+              <div className="lg:col-span-12 max-w-4xl w-full mx-auto">
+                <button type="button" onClick={() => setActiveTab("consultar-inscricao")} className="inline-block mb-4 text-sm font-bold text-indigo-700 underline">Consultar inscrição</button>
                 {completedRegistration ? (
                   <div className="bg-surface rounded-3xl border-2 border-emerald-500/40 p-6 sm:p-10 shadow-xl space-y-6">
                     <div className="flex justify-between items-center border-b pb-6">
@@ -1929,10 +1930,15 @@ export default function App() {
                 )}
               </div>
 
-              <div className="lg:col-span-4">
-                <ConsultarInscricao />
-              </div>
+
             </div>
+          </div>
+        )}
+
+        {activeTab === 'consultar-inscricao' && (
+          <div className="max-w-3xl mx-auto px-4 py-10 space-y-4">
+            <button type="button" onClick={() => setActiveTab("register")} className="text-sm font-bold text-indigo-700 underline">Voltar para inscrições</button>
+            <ConsultarInscricao />
           </div>
         )}
 
