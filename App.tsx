@@ -1,7 +1,10 @@
+import ConsultarInscricao from './ConsultarInscricao';
+import { displayTime } from './lib/displayTime';
+import {scheduleDefaults,typeLabel,compareSchedule} from './lib/scheduleConfig';
 import {newsToHtml} from './lib/newsRichText';
 import AdminSeguro from './AdminSeguro';
 import { PublicNotices } from './Notices';
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import {
   FolderOpen,
   ExternalLink,
@@ -30,6 +33,7 @@ import {
   AlertCircle,
   Check,
   X,
+  Menu,
   ArrowRight,
   Copy,
   Radio,
@@ -237,28 +241,12 @@ const syncModulePermissions = (perms) => {
 
 const INITIAL_ADMINS = []; // Contas administrativas são gerenciadas no Supabase Auth.
 
-const INITIAL_REGISTRATIONS = [
-  {
-    id: 'reg-101',
-    protocol: 'SEACOM-2026-8491',
-    name: 'Mariana Costa Oliveira',
-    email: 'mariana.oliveira@aluno.edu.br',
-    cpfOrId: '202310459',
-    course: '',
-    period: '5º Período',
-    phone: '(68) 99912-3456',
-    institution: '',
-    selectedActivityIds: ['act-1', 'act-3'],
-    createdAt: '05/11/2026 às 14:20'
-  }
-];
-
 // ============================================================================
 // COMPONENTE PRINCIPAL
 // ============================================================================
 
 export default function App() {
-  const validPages = ['home', 'schedule', 'news', 'media', 'register', 'editais', 'admin', 'article'];
+  const validPages = ['home', 'schedule', 'news', 'media', 'register', 'consultar-inscricao', 'editais', 'admin', 'article'];
   const getPageFromUrl = () => {
     const hash = window.location.hash.replace(/^#\/?/, '');
     if (hash.startsWith('article/')) return 'article';
@@ -266,6 +254,8 @@ export default function App() {
     return new URLSearchParams(window.location.search).get('admin') === 'login' ? 'admin' : 'home';
   };
   const [activeTab, setActiveTabState] = useState(getPageFromUrl);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const mobileMenuButton = useRef<HTMLButtonElement>(null);
   const [animateCover, setAnimateCover] = useState(() => activeTab === 'home');
   useEffect(() => {
     if (!animateCover) return;
@@ -280,11 +270,22 @@ export default function App() {
   const [articleId, setArticleId] = useState(() => decodeURIComponent(window.location.hash.match(/^#\/article\/(.+)$/)?.[1] || ''));
   const setActiveTab = (page) => {
     if (!validPages.includes(page)) return;
+    setMobileMenuOpen(false);
     window.history.pushState({page}, '', `${window.location.pathname}${window.location.search}#/${page}`);
     if (page !== 'article') setArticleId('');
     setActiveTabState(page);
     setContentRevision(v => v + 1);
     window.scrollTo({top: 0, behavior: 'instant'});
+  };
+  const reloadSection = (page: string) => {
+    setMobileMenuOpen(false);
+    if (page === activeTab || !validPages.includes(page)) return;
+    const destination = new URL(window.location.href);
+    destination.searchParams.delete('admin');
+    destination.hash = '/' + page;
+    // A troca de hash sozinha não carrega um novo documento.
+    window.history.pushState({page}, '', destination);
+    window.location.reload();
   };
   const openArticle = (id) => {
     window.history.pushState({page:'article'}, '', `${window.location.pathname}${window.location.search}#/article/${encodeURIComponent(id)}`);
@@ -292,14 +293,28 @@ export default function App() {
     window.scrollTo({top:0,behavior:'instant'});
   };
   useEffect(() => {
-    const onHistory = () => { setActiveTabState(getPageFromUrl()); setArticleId(decodeURIComponent(window.location.hash.match(/^#\/article\/(.+)$/)?.[1] || '')); setContentRevision(v => v + 1); };
+    const onHistory = () => { setMobileMenuOpen(false); setActiveTabState(getPageFromUrl()); setArticleId(decodeURIComponent(window.location.hash.match(/^#\/article\/(.+)$/)?.[1] || '')); setContentRevision(v => v + 1); };
     const onUpdated = () => setContentRevision(v => v + 1);
+    const onVisible = () => { if (!document.hidden) onUpdated(); };
+    const onPageShow = (event: PageTransitionEvent) => { if (event.persisted) onUpdated(); };
     window.addEventListener('popstate', onHistory);
     window.addEventListener('hashchange', onHistory);
     window.addEventListener('seacom:content-updated', onUpdated);
-    return () => { window.removeEventListener('popstate', onHistory); window.removeEventListener('hashchange', onHistory); window.removeEventListener('seacom:content-updated', onUpdated); };
+    window.addEventListener('pageshow', onPageShow);
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      window.removeEventListener('popstate', onHistory);
+      window.removeEventListener('hashchange', onHistory);
+      window.removeEventListener('seacom:content-updated', onUpdated);
+      window.removeEventListener('pageshow', onPageShow);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
   }, []);
 
+  const [scheduleLabels,setScheduleLabels]=useState(scheduleDefaults);
+  const [scheduleDayLabels,setScheduleDayLabels]=useState<Record<string,string>>({});
+  const [scheduleOrder,setScheduleOrder]=useState<Record<string,string[]>>({});
+  useEffect(()=>{let live=true;(async()=>{try{const {supabase}=await import('./lib/supabase');const {data}=await supabase.from('seacom_schedule_config').select('labels,day_labels,activity_order').eq('id',1).maybeSingle();if(live&&data){setScheduleLabels({...scheduleDefaults,...data.labels});setScheduleDayLabels(data.day_labels||{});setScheduleOrder(data.activity_order||{});}}catch(e){console.warn('Personalização da programação indisponível',e)}})();return()=>{live=false}},[contentRevision,activeTab]);
   const [siteConfig, setSiteConfig] = useState(INITIAL_SITE_CONFIG);
   const [activities, setActivities] = useState(INITIAL_ACTIVITIES);
   const [programacaoStatus, setProgramacaoStatus] = useState('carregando');
@@ -318,7 +333,7 @@ export default function App() {
         const { supabase } = await import('./lib/supabase');
         const { data, error } = await supabase
           .from('activities')
-          .select('id,title,description,activity_type,starts_at,ends_at,location,capacity')
+          .select('id,title,description,activity_type,starts_at,ends_at,location,capacity,speaker:speakers!speaker_id(name,bio)')
           .eq('is_published', true)
           .order('starts_at', { ascending: true });
         if (error) throw error;
@@ -335,7 +350,7 @@ export default function App() {
           const dataFim = new Date(item.ends_at);
           const dateParts = Object.fromEntries(formatDate.formatToParts(dataInicio).map((part) => [part.type, part.value]));
           const isoDate = `${dateParts.year}-${dateParts.month}-${dateParts.day}`;
-          const speaker = null; // Consulta pública simplificada, sem dependência da relação speakers
+          const speaker = item.speaker;
           const horas = Math.max(0, (dataFim.getTime() - dataInicio.getTime()) / 3600000);
           return {
             id: item.id, type: tipos[item.activity_type] || 'Outro',
@@ -358,7 +373,11 @@ export default function App() {
           }))
         }));
         setActivities(registros);
-        setRegForm((prev) => ({ ...prev, selectedActivityIds: [] }));
+        const publishedIds = new Set(registros.map(item => item.id));
+        setRegForm(prev => ({
+          ...prev,
+          selectedActivityIds: prev.selectedActivityIds.filter(id => publishedIds.has(id))
+        }));
         setProgramacaoStatus('conectado');
       } catch (err) {
         if (!ativo) return;
@@ -394,7 +413,6 @@ export default function App() {
   }, [contentRevision, activeTab]);
 
   const [admins, setAdmins] = useState(INITIAL_ADMINS);
-  const [registrations, setRegistrations] = useState(INITIAL_REGISTRATIONS);
 
   const [currentAdminId, setCurrentAdminId] = useState(null);
   const [loginUsername, setLoginUsername] = useState('');
@@ -430,9 +448,6 @@ export default function App() {
   const [showParticipantPassword, setShowParticipantPassword] = useState(false);
   const [completedRegistration, setCompletedRegistration] = useState(null);
   const [registrationBusy, setRegistrationBusy] = useState(false);
-  const [lookupQuery, setLookupQuery] = useState('');
-  const [lookupResult, setLookupResult] = useState(null);
-  const [lookupAttempted, setLookupAttempted] = useState(false);
 
   const [toast, setToast] = useState(null);
   const [confirmModal, setConfirmModal] = useState(null);
@@ -682,9 +697,9 @@ export default function App() {
       })
       .sort((a, b) => {
         if (a.isoDate !== b.isoDate) return (a.isoDate || '').localeCompare(b.isoDate || '');
-        return a.startTime.localeCompare(b.startTime);
+        return compareSchedule(a,b,scheduleOrder[a.isoDate]||[],a.startTime.localeCompare(b.startTime)||a.id.localeCompare(b.id));
       });
-  }, [activities, selectedDayFilter, selectedTypeFilter, scheduleSearch]);
+  }, [activities, selectedDayFilter, selectedTypeFilter, scheduleSearch,scheduleOrder]);
 
   const handleAdminLogin = (e) => {
     e.preventDefault();
@@ -996,29 +1011,6 @@ export default function App() {
     });
   };
 
-  const handleDeleteRegistration = (reg) => {
-    if (!hasPermission('inscritos_excluir')) {
-      showToast('Seu usuário não tem permissão para remover inscrições.', 'error');
-      return;
-    }
-    setConfirmModal({
-      title: 'Cancelar Inscrição',
-      message: `Deseja cancelar a inscrição de ${reg.name} (${reg.protocol})?`,
-      onConfirm: () => {
-        setRegistrations((prev) => prev.filter((r) => r.id !== reg.id));
-        setActivities((prev) =>
-          prev.map((act) =>
-            reg.selectedActivityIds.includes(act.id) && act.enrolledCount > 0
-              ? { ...act, enrolledCount: act.enrolledCount - 1 }
-              : act
-          )
-        );
-        setConfirmModal(null);
-        showToast('Inscrição cancelada.');
-      }
-    });
-  };
-
   const handleToggleActivitySelection = (actId) => {
     setRegForm((prev) => {
       const exists = prev.selectedActivityIds.includes(actId);
@@ -1112,28 +1104,27 @@ export default function App() {
       const result = Array.isArray(data) ? data[0] : data;
       const protocol = typeof result === 'string' ? result : result?.protocol;
       if (!protocol) throw new Error('O banco não retornou o protocolo da inscrição. Verifique a função SQL.');
-      setCompletedRegistration({...regForm,protocol});
+      // E-mail de confirmação com a relação de atividades. Se falhar, a inscrição
+      // continua válida (já foi gravada): apenas avisamos o participante.
+      let emailSent = false;
+      try {
+        const mailResp = await fetch(`${url}/functions/v1/seacom-send-registration-email`, {
+          method:'POST',
+          headers:{'Content-Type':'application/json','Authorization':`Bearer ${authSession.access_token}`,'apikey':key},
+          body:'{}'
+        });
+        emailSent = mailResp.ok;
+      } catch { emailSent = false; }
+      setCompletedRegistration({...regForm,protocol,emailSent});
       setParticipantPassword(''); setParticipantPasswordConfirm('');
-      showToast('Inscrição confirmada e salva! Sua presença na palestra será registrada separadamente pelo QR Code. Protocolo: '+protocol);
+      showToast(emailSent
+        ? 'Inscrição confirmada! Enviamos os detalhes para o seu e-mail. Protocolo: '+protocol
+        : 'Inscrição confirmada e salva! Não conseguimos enviar o e-mail agora; guarde seu protocolo: '+protocol);
       window.dispatchEvent(new Event('seacom:content-updated'));
     } catch (err) {
       const msg = err?.message || 'Erro desconhecido';
       showToast('Não foi possível concluir a inscrição: '+msg, 'error');
     } finally { setRegistrationBusy(false); }
-  };
-
-  const handleLookupRegistration = (e) => {
-    e.preventDefault();
-    const q = lookupQuery.trim().toLowerCase();
-    if (!q) return;
-    const found = registrations.find(
-      (r) =>
-        r.protocol.toLowerCase() === q ||
-        r.email.toLowerCase() === q ||
-        r.cpfOrId.toLowerCase() === q
-    );
-    setLookupResult(found || null);
-    setLookupAttempted(true);
   };
 
   return (
@@ -1403,9 +1394,6 @@ export default function App() {
                   <span>Voltar para João Henrique Silva</span>
                 </button>
               )}
-              <button onClick={() => setActiveTab('admin')} className="underline hover:text-white font-medium">
-                Painel Admin
-              </button>
               <button
                 onClick={() => {
                   setCurrentAdminId(null);
@@ -1421,10 +1409,16 @@ export default function App() {
       )}
 
       {/* HEADER */}
-      <header className="sticky top-0 z-40 bg-surface/90 backdrop-blur-md border-b border-slate-200/80">
-        <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 min-h-20 py-3 flex flex-wrap xl:flex-nowrap items-center justify-between gap-3">
+      <header className="sticky top-0 z-40 bg-surface/90 backdrop-blur-md border-b border-slate-200/80"
+        onKeyDown={event => {
+          if (event.key === 'Escape' && mobileMenuOpen) {
+            setMobileMenuOpen(false);
+            mobileMenuButton.current?.focus();
+          }
+        }}>
+        <div className="relative max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 min-h-20 py-3 flex items-center justify-between gap-3">
           <button
-            onClick={() => setActiveTab('home')}
+            onClick={() => reloadSection('home')}
             className="flex min-w-0 items-center gap-3 text-left group focus:outline-none"
           >
             <div className="rounded-2xl identity-gradient-brand flex items-center justify-center text-white shadow-md shadow-indigo-500/20 group-hover:scale-105 transition shrink-0 overflow-hidden" style={{width:siteConfig.headerLogoSize||44,height:siteConfig.headerLogoSize||44}}>
@@ -1435,23 +1429,31 @@ export default function App() {
                 <span className="text-xl font-extrabold tracking-tight text-slate-900">
                   {siteConfig.acronym}
                 </span>
-                <span className={`${siteConfig.headerShowEdition === false ? 'hidden' : 'hidden sm:inline-block'} text-[11px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200/60`}>
+                <span className={`${siteConfig.headerShowEdition === false ? 'hidden' : 'hidden xl:inline-block'} text-[11px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200/60`}>
                   {siteConfig.edition}
                 </span>
               </div>
-              <p className="text-xs text-slate-500 font-medium line-clamp-1">{siteConfig.fullName}</p>
+              <p className="text-xs text-slate-500 font-medium xl:line-clamp-1">{siteConfig.fullName}</p>
             </div>
           </button>
 
-          <nav aria-label="Menu principal" className="order-last w-full xl:order-none xl:w-auto min-w-0 flex items-center gap-1 overflow-x-auto bg-slate-100/80 p-1.5 rounded-2xl border border-slate-200/60">
+          <button type="button" ref={mobileMenuButton} aria-controls="main-navigation"
+            aria-expanded={mobileMenuOpen} aria-label={mobileMenuOpen ? 'Fechar menu' : 'Abrir menu'}
+            onClick={() => setMobileMenuOpen(open => !open)}
+            className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-slate-200 bg-surface text-slate-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-600 xl:hidden">
+            {mobileMenuOpen ? <X aria-hidden="true" className="h-5 w-5" /> : <Menu aria-hidden="true" className="h-5 w-5" />}
+          </button>
+
+          <nav id="main-navigation" aria-label="Menu principal"
+            className={`${mobileMenuOpen ? 'mobile-navigation flex' : 'hidden'} absolute inset-x-4 top-full mt-2 max-h-[65dvh] flex-col gap-1 overflow-y-auto rounded-2xl border border-slate-200 bg-surface p-2 shadow-lg sm:inset-x-6 xl:static xl:mt-0 xl:flex xl:max-h-none xl:min-w-0 xl:flex-row xl:items-center xl:overflow-x-auto xl:bg-slate-100/80 xl:p-1.5 xl:shadow-none`}>
             {[
               { id: 'home', label: 'Início', icon: Sparkles },
-              { id: 'schedule', label: 'Programação', icon: Calendar, badge: activities.length },
+              { id: 'schedule', label: scheduleLabels.menu, icon: Calendar, badge: activities.length },
               { id: 'news', label: 'Notícias', icon: Newspaper, badge: newsList.length },
               { id: 'media', label: 'Mídias', icon: FolderOpen },
               { id: 'register', label: 'Inscrição', icon: UserCheck },
               { id: 'editais', label: 'Editais e Avisos', icon: FileText }
-            ].map((item) => {
+            ].map((item, index) => {
               const Icon = item.icon;
               const isActive = activeTab === item.id;
               return (
@@ -1459,8 +1461,12 @@ export default function App() {
                   key={item.id}
                   type="button"
                   aria-current={isActive ? 'page' : undefined}
-                  onClick={() => setActiveTab(item.id)}
-                  className={`flex shrink-0 items-center gap-2 whitespace-nowrap px-3 py-2 2xl:px-4 rounded-xl text-sm font-semibold transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-600 ${
+                  onClick={() => {
+                    if (mobileMenuOpen && mobileMenuButton.current?.getClientRects().length) mobileMenuButton.current.focus();
+                    reloadSection(item.id);
+                  }}
+                  style={{ '--menu-delay': index * 45 + 'ms' } as React.CSSProperties}
+                  className={`flex min-h-11 shrink-0 items-center gap-2 whitespace-nowrap px-3 py-2 2xl:px-4 rounded-xl text-left text-sm font-semibold transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-600 xl:min-h-0 ${
                     isActive ? 'bg-surface text-indigo-700 shadow-sm' : 'text-slate-600 hover:text-slate-900 hover:bg-surface/50'
                   }`}
                 >
@@ -1471,26 +1477,13 @@ export default function App() {
             })}
           </nav>
 
-          <div className="flex shrink-0 items-center gap-2.5 whitespace-nowrap">
+          <div className="hidden shrink-0 items-center gap-2.5 whitespace-nowrap xl:flex">
             <button
-              onClick={() => setActiveTab('register')}
+              onClick={() => reloadSection('register')}
               className="hidden sm:inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm shadow-indigo-500/20 transition"
             >
               <span>Inscreva-se</span>
               <ArrowRight className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => setActiveTab('admin')}
-              className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-sm font-semibold border transition ${
-                activeTab === 'admin'
-                  ? 'bg-slate-900 text-white border-slate-900'
-                  : currentAdmin
-                  ? 'bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100'
-                  : 'bg-surface text-slate-700 border-slate-200 hover:bg-slate-100'
-              }`}
-            >
-              <Shield className="w-4 h-4" />
-              <span className="hidden lg:inline">{currentAdmin ? 'Painel Admin' : 'Área Admin'}</span>
             </button>
           </div>
         </div>
@@ -1503,11 +1496,11 @@ export default function App() {
           <div>
             {homeSections.filter(section => section.visible !== false).map(section => {
               if (section.type === 'hero') return <React.Fragment key={section.id}>
-            <section className="identity-hero relative overflow-hidden bg-slate-950 text-white py-16 lg:py-24" style={siteConfig.coverUrl ? {backgroundImage:`url(${siteConfig.coverUrl})`,backgroundPosition:"center",backgroundSize:"cover"} : undefined}>
+            <section className={`identity-hero relative overflow-hidden bg-slate-950 text-white py-16 lg:py-24 ${animateCover ? 'cover-enter' : ''}`} style={siteConfig.coverUrl ? {backgroundImage:`url(${siteConfig.coverUrl})`,backgroundPosition:"center",backgroundSize:"cover"} : undefined}>
               <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="grid lg:grid-cols-12 gap-12 items-center">
                   <div className="lg:col-span-7 space-y-6">
-                    <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-indigo-500/15 border border-indigo-400/30 text-indigo-300 text-xs font-semibold">
+                    <div className="cover-badge inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-indigo-500/15 border border-indigo-400/30 text-indigo-300 text-xs font-semibold">
                       <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
                       <span>{siteConfig.heroBadge}</span>
                     </div>
@@ -1532,19 +1525,19 @@ export default function App() {
                         })() : siteConfig.heroTitle}
                       </span>
                     </h1>
-                    <p className="text-slate-300 text-base sm:text-lg leading-relaxed max-w-2xl">
+                    <p className="cover-subtitle text-slate-300 text-base sm:text-lg leading-relaxed max-w-2xl">
                       {siteConfig.heroSubtitle}
                     </p>
-                    <div className="flex flex-wrap items-center gap-4 pt-3">
+                    <div className="cover-actions flex flex-wrap items-center gap-4 pt-3">
                       <button
-                        onClick={() => setActiveTab('register')}
+                        onClick={() => reloadSection('register')}
                         className="px-6 py-3.5 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-sm shadow-lg shadow-indigo-600/30 flex items-center gap-2 transition"
                       >
                         <span>Fazer Minha Inscrição Agora</span>
                         <ArrowRight className="w-4 h-4" />
                       </button>
                       <button
-                        onClick={() => setActiveTab('schedule')}
+                        onClick={() => reloadSection('schedule')}
                         className="px-6 py-3.5 rounded-2xl bg-surface/10 hover:bg-surface/15 text-white font-semibold text-sm border border-white/15 flex items-center gap-2 transition"
                       >
                         <Calendar className="w-4 h-4" />
@@ -1553,7 +1546,7 @@ export default function App() {
                     </div>
                   </div>
 
-                  <div className="lg:col-span-5">
+                  <div className="cover-panorama lg:col-span-5">
                     <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-6">
                       <div className="flex items-center justify-between border-b border-slate-800 pb-4">
                         <div>
@@ -1589,9 +1582,9 @@ export default function App() {
               if (section.type === 'about') return <React.Fragment key={section.id}>
             <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14 space-y-4"><h2 className="text-3xl font-extrabold text-slate-900">Sobre a SEACOM 2026</h2><p className="max-w-3xl text-slate-600 leading-relaxed">{siteConfig.aboutText}</p><div className="grid md:grid-cols-3 gap-4 pt-4"><div className="rounded-2xl bg-surface border p-5"><strong>Programação</strong><p className="text-sm text-slate-600 mt-2">Palestras, oficinas e mesas redondas</p></div><div className="rounded-2xl bg-surface border p-5"><strong>Comunicação</strong><p className="text-sm text-slate-600 mt-2">Notícias e atualizações do evento</p></div><div className="rounded-2xl bg-surface border p-5"><strong>Participação</strong><p className="text-sm text-slate-600 mt-2">Atividades e registro de presença</p></div></div></section>
               </React.Fragment>;
-              if (section.type === 'schedule') return <section key={section.id} className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-5"><div className="flex flex-wrap items-center justify-between gap-3"><div><span className="text-xs font-bold uppercase tracking-widest text-indigo-600">SEACOM 2026</span><h2 className="text-3xl font-extrabold text-slate-900">Programação</h2></div><button type="button" onClick={() => setActiveTab('schedule')} className="rounded-xl bg-indigo-700 text-white px-5 py-3 font-semibold">Ver programação completa →</button></div><div className="grid gap-4 md:grid-cols-3">{activities.slice(0,3).map(a=><div key={a.id} className="bg-surface border border-slate-200 rounded-2xl p-5"><h3 className="font-bold text-slate-900">{a.title}</h3><p className="text-sm text-slate-600 mt-2">{a.description || 'Confira os detalhes na programação.'}</p></div>)}{activities.length===0&&<p className="text-slate-600">Programação em atualização.</p>}</div></section>;
-              if (section.type === 'news') return <section key={section.id} className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-5"><div className="flex flex-wrap items-center justify-between gap-3"><h2 className="text-3xl font-extrabold text-slate-900">Últimas notícias</h2><button type="button" onClick={() => setActiveTab('news')} className="rounded-xl bg-indigo-700 text-white px-5 py-3 font-semibold">Ver todas as notícias →</button></div><div className="grid gap-4 md:grid-cols-3">{newsList.slice(0,3).map(n=><article key={n.id} className="bg-surface border border-slate-200 rounded-2xl overflow-hidden"><img src={n.imageUrl} alt={n.title} className="w-full aspect-[4/3] object-cover"/><div className="p-5"><h3 className="font-bold text-slate-900">{n.title}</h3><p className="text-sm text-slate-600 mt-2">{n.summary}</p><button type="button" onClick={() => openArticle(n.id)} className="mt-3 text-sm font-bold text-indigo-700 hover:underline">Ler matéria completa →</button></div></article>)}{newsList.length===0&&<p className="text-slate-600">Nenhuma notícia publicada.</p>}</div></section>;
-              if (section.type === 'register') return <section key={section.id} className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12"><div className="rounded-3xl bg-indigo-950 text-white p-8 sm:p-12 flex flex-col md:flex-row gap-6 md:items-center md:justify-between"><div><h2 className="text-3xl font-extrabold">Participe da SEACOM 2026</h2><p className="text-indigo-100 mt-3">Acesse a área de inscrições para escolher suas atividades.</p></div><button type="button" onClick={() => setActiveTab('register')} className="rounded-xl bg-surface text-indigo-950 px-6 py-3 font-bold">Ir para inscrições →</button></div></section>;
+              if (section.type === 'schedule') return <section key={section.id} className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-5"><div className="flex flex-wrap items-center justify-between gap-3"><div><span className="text-xs font-bold uppercase tracking-widest text-indigo-600">SEACOM 2026</span><h2 className="text-3xl font-extrabold text-slate-900">Programação</h2></div><button type="button" onClick={() => reloadSection('schedule')} className="rounded-xl bg-indigo-700 text-white px-5 py-3 font-semibold">Ver programação completa →</button></div><div className="grid gap-4 md:grid-cols-3">{activities.slice(0,3).map(a=><div key={a.id} className="bg-surface border border-slate-200 rounded-2xl p-5"><h3 className="font-bold text-slate-900">{a.title}</h3><p className="text-sm text-slate-600 mt-2">{a.description || 'Confira os detalhes na programação.'}</p></div>)}{activities.length===0&&<p className="text-slate-600">Programação em atualização.</p>}</div></section>;
+              if (section.type === 'news') return <section key={section.id} className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-5"><div className="flex flex-wrap items-center justify-between gap-3"><h2 className="text-3xl font-extrabold text-slate-900">Últimas notícias</h2><button type="button" onClick={() => reloadSection('news')} className="rounded-xl bg-indigo-700 text-white px-5 py-3 font-semibold">Ver todas as notícias →</button></div><div className="grid gap-4 md:grid-cols-3">{newsList.slice(0,3).map(n=><article key={n.id} className="bg-surface border border-slate-200 rounded-2xl overflow-hidden"><img src={n.imageUrl} alt={n.title} className="w-full aspect-[4/3] object-cover"/><div className="p-5"><h3 className="font-bold text-slate-900">{n.title}</h3><p className="text-sm text-slate-600 mt-2">{n.summary}</p><button type="button" onClick={() => openArticle(n.id)} className="mt-3 text-sm font-bold text-indigo-700 hover:underline">Ler matéria completa →</button></div></article>)}{newsList.length===0&&<p className="text-slate-600">Nenhuma notícia publicada.</p>}</div></section>;
+              if (section.type === 'register') return <section key={section.id} className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12"><div className="rounded-3xl bg-indigo-950 text-white p-8 sm:p-12 flex flex-col md:flex-row gap-6 md:items-center md:justify-between"><div><h2 className="text-3xl font-extrabold">Participe da SEACOM 2026</h2><p className="text-indigo-100 mt-3">Acesse a área de inscrições para escolher suas atividades.</p></div><button type="button" onClick={() => reloadSection('register')} className="rounded-xl bg-surface text-indigo-950 px-6 py-3 font-bold">Ir para inscrições →</button></div></section>;
               if (section.type === 'text') return <section key={section.id} className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12"><div className="bg-surface border border-slate-200 rounded-3xl p-7 sm:p-10"><h2 className="text-2xl font-extrabold text-slate-900 mb-3">{section.title || 'Informações'}</h2><p className="whitespace-pre-line text-slate-600 leading-relaxed">{section.body || ''}</p></div></section>;
               return null;
             })}
@@ -1603,13 +1596,13 @@ export default function App() {
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
             <div className="identity-gradient-banner rounded-3xl p-6 sm:p-10 text-white mb-8 shadow-lg">
               <span className="text-xs font-bold uppercase tracking-wider text-indigo-300 bg-indigo-500/20 px-3 py-1 rounded-full">
-                Cronograma Oficial • {siteConfig.acronym}
+                {scheduleLabels.badge || `Cronograma Oficial • ${siteConfig.acronym}`}
               </span>
-              <h1 className="text-2xl sm:text-4xl font-extrabold mt-3">Programação de Painéis e Mesas Redondas</h1>
+              <h1 className="text-2xl sm:text-4xl font-extrabold mt-3">{scheduleLabels.title}</h1>
               <p className="mt-3 text-sm text-indigo-100" role="status">
                 {programacaoStatus === 'carregando' && 'Carregando programação...'}
                 {programacaoStatus === 'sem-configuracao' && `Programação indisponível no momento.`}
-                {programacaoStatus === 'conectado' && (activities.length ? 'Programação atualizada.' : 'Nenhuma atividade publicada no momento.')}
+                {programacaoStatus === 'conectado' && (activities.length ? scheduleLabels.subtitle : 'Nenhuma atividade publicada no momento.')}
                 {programacaoStatus === 'erro' && `Não foi possível carregar a programação. Tente novamente mais tarde.`}
               </p>
               <div className="mt-6 flex flex-wrap gap-2.5">
@@ -1621,7 +1614,7 @@ export default function App() {
                       : 'bg-surface/10 text-white border-white/15'
                   }`}
                 >
-                  Todos os Dias ({activities.length})
+                  {scheduleLabels.allDays} ({activities.length})
                 </button>
                 {siteConfig.days.map((day) => {
                   const isSelected = selectedDayFilter === day.id;
@@ -1636,7 +1629,7 @@ export default function App() {
                       }`}
                     >
                       <span className="text-xs sm:text-sm font-bold block">
-                        {day.label} — {day.date}
+                        {scheduleDayLabels[day.isoDate]?.trim() || day.label} — {day.date}
                       </span>
                     </button>
                   );
@@ -1646,7 +1639,7 @@ export default function App() {
 
             <div className="bg-surface rounded-2xl p-4 border border-slate-200/80 shadow-sm mb-8 flex flex-col md:flex-row justify-between gap-4">
               <div className="flex flex-wrap items-center gap-2">
-                {['all', 'Painel', 'Mesa Redonda', 'Oficina'].map((type) => (
+                {['all', 'Painel', 'Mesa Redonda', 'Oficina', ...(activities.some(a=>a.type==='Outro')?['Outro']:[])].map((type) => (
                   <button
                     key={type}
                     onClick={() => setSelectedTypeFilter(type)}
@@ -1654,7 +1647,7 @@ export default function App() {
                       selectedTypeFilter === type ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600'
                     }`}
                   >
-                    {type === 'all' ? 'Todos os Formatos' : type}
+                    {type === 'all' ? scheduleLabels.allTypes : typeLabel(type,scheduleLabels)}
                   </button>
                 ))}
               </div>
@@ -1664,7 +1657,7 @@ export default function App() {
                   type="text"
                   value={scheduleSearch}
                   onChange={(e) => setScheduleSearch(e.target.value)}
-                  placeholder="Buscar por tema ou palestrante..."
+                  placeholder={scheduleLabels.search}
                   className="w-full pl-10 pr-4 py-2 rounded-xl border border-slate-200 text-sm"
                 />
               </div>
@@ -1680,18 +1673,18 @@ export default function App() {
                       <div className="space-y-3 flex-1">
                         <div className="flex flex-wrap items-center gap-2.5">
                           <span className={`text-xs font-bold px-3 py-1 rounded-full border ${getBadgeStyle(act.type)}`}>
-                            {act.type}
+                            {typeLabel(act.type,scheduleLabels)}
                           </span>
                           <span className="text-xs font-bold px-3 py-1 rounded-full bg-slate-100 text-slate-800">
-                            {day.displayLabel} — {day.date || act.date}
+                            {scheduleDayLabels[act.isoDate]?.trim() || day.displayLabel} — {day.date || act.date}
                           </span>
                           <span className="text-xs font-bold px-3 py-1 rounded-full bg-indigo-50 text-indigo-700">
-                            {act.startTime} às {act.endTime}
+                            {displayTime(act.startTime)} às {displayTime(act.endTime)}
                           </span>
                         </div>
                         <h3 className="text-xl font-extrabold text-slate-900">{act.title}</h3>
                         <p className="text-sm text-slate-600">{act.description}</p>
-                        <p className="text-xs font-bold text-indigo-900">Palestrantes: {act.speakers}</p>
+                        <p className="text-xs font-bold text-indigo-900">{scheduleLabels.speaker}: {act.speakers}</p>
                       </div>
                       <div className="lg:w-72 shrink-0 bg-slate-50 rounded-2xl p-5 border flex flex-col justify-between space-y-4">
                         <span className="text-xs text-slate-700 block font-semibold">{act.location}</span>
@@ -1772,7 +1765,7 @@ export default function App() {
         {activeTab === 'article' && (() => {
           const n = newsList.find(item => String(item.id) === articleId);
           return <main className="max-w-4xl mx-auto px-4 sm:px-6 py-10 min-h-[50vh]">
-            <button type="button" onClick={() => setActiveTab('news')} className="mb-6 text-indigo-700 font-semibold hover:underline">← Voltar às notícias</button>
+            <button type="button" onClick={() => reloadSection('news')} className="mb-6 text-indigo-700 font-semibold hover:underline">← Voltar às notícias</button>
             {n ? <article className="bg-surface rounded-3xl overflow-hidden border border-slate-200 shadow-sm">
               <img src={n.imageUrl} alt={n.title} className="w-full aspect-[4/3] object-cover" />
               <div className="p-6 sm:p-10 space-y-5">
@@ -1785,7 +1778,7 @@ export default function App() {
           </main>;
         })()}
 
-        {activeTab === 'editais' && <PublicNotices />}
+        {activeTab === 'editais' && <PublicNotices revision={contentRevision} />}
         {activeTab === 'media' && (
           <section aria-labelledby="media-title" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-14">
             <h1 id="media-title" className="text-3xl sm:text-4xl font-extrabold text-slate-900">Mídias</h1>
@@ -1812,7 +1805,8 @@ export default function App() {
         {activeTab === 'register' && (
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
             <div className="grid lg:grid-cols-12 gap-8">
-              <div className="lg:col-span-8">
+              <div className="lg:col-span-12 max-w-4xl w-full mx-auto">
+                <button type="button" onClick={() => setActiveTab("consultar-inscricao")} className="inline-block mb-4 text-sm font-bold text-indigo-700 underline">Consultar inscrição</button>
                 {completedRegistration ? (
                   <div className="bg-surface rounded-3xl border-2 border-emerald-500/40 p-6 sm:p-10 shadow-xl space-y-6">
                     <div className="flex justify-between items-center border-b pb-6">
@@ -1822,6 +1816,9 @@ export default function App() {
                       </span>
                     </div>
                     <p className="text-sm font-bold text-slate-800">Participante: {completedRegistration.name}</p>
+                    {completedRegistration.emailSent
+                      ? <p className="text-sm text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-xl p-3">Enviamos a confirmação e a lista das suas atividades para <strong>{completedRegistration.email}</strong>. Se não aparecer na caixa de entrada, confira o spam.</p>
+                      : <p className="text-sm text-amber-900 bg-amber-50 border border-amber-200 rounded-xl p-3">Sua inscrição está salva, mas não foi possível enviar o e-mail de confirmação agora. Guarde o protocolo acima.</p>}
                     <button
                       onClick={() => setCompletedRegistration(null)}
                       className="px-5 py-2.5 rounded-xl bg-indigo-600 text-white text-xs font-bold"
@@ -1881,7 +1878,7 @@ export default function App() {
                         </div>
                       </div>
                       <label className="inline-flex items-center gap-2 text-xs text-slate-700"><input type="checkbox" checked={showParticipantPassword} onChange={e=>setShowParticipantPassword(e.target.checked)}/> Mostrar senhas</label>
-                      <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-xl p-3">Ao clicar em Confirmar Inscrição, seu cadastro e sua vaga na atividade serão registrados imediatamente. O QR Code é utilizado depois, somente para registrar presença. A confirmação por e-mail está desativada durante os testes privados.</p>
+                      <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-xl p-3">Ao clicar em Confirmar Inscrição, seu cadastro e sua vaga na atividade serão registrados imediatamente. O QR Code é utilizado depois, somente para registrar presença. Você receberá por e-mail a confirmação com o protocolo e a lista das atividades escolhidas.</p>
                     </div>
 
                     <div className="space-y-4 pt-4 border-t">
@@ -1909,9 +1906,12 @@ export default function App() {
                               </div>
                               <div>
                                 <span className="text-[11px] font-bold text-indigo-700">
-                                  {act.type} • {day.label} ({day.date})
+                                  {typeLabel(act.type,scheduleLabels)} • {scheduleDayLabels[act.isoDate]?.trim() || day.label} ({day.date})
                                 </span>
                                 <h3 className="text-sm font-bold text-slate-900">{act.title}</h3>
+                                <p className="mt-1 break-words text-xs text-slate-600">
+                                  <span className="font-semibold">Local:</span> {act.location?.trim() || 'Local a definir'}
+                                </p>
                               </div>
                             </div>
                           );
@@ -1930,30 +1930,15 @@ export default function App() {
                 )}
               </div>
 
-              <div className="lg:col-span-4">
-                <div className="bg-surface rounded-3xl border p-6 shadow-sm space-y-4">
-                  <h3 className="text-sm font-extrabold text-slate-900">Consultar Inscrição</h3>
-                  <form onSubmit={handleLookupRegistration} className="space-y-2.5">
-                    <input
-                      type="text"
-                      value={lookupQuery}
-                      onChange={(e) => setLookupQuery(e.target.value)}
-                      placeholder="Protocolo ou e-mail..."
-                      className="w-full px-3.5 py-2.5 rounded-xl border text-xs"
-                    />
-                    <button type="submit" className="w-full py-2.5 rounded-xl bg-slate-900 text-white text-xs font-bold">
-                      Buscar
-                    </button>
-                  </form>
-                  {lookupAttempted && lookupResult && (
-                    <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-xs">
-                      <p className="font-bold text-emerald-900">{lookupResult.name}</p>
-                      <p className="font-mono font-bold text-emerald-800">{lookupResult.protocol}</p>
-                    </div>
-                  )}
-                </div>
-              </div>
+
             </div>
+          </div>
+        )}
+
+        {activeTab === 'consultar-inscricao' && (
+          <div className="max-w-3xl mx-auto px-4 py-10 space-y-4">
+            <button type="button" onClick={() => setActiveTab("register")} className="text-sm font-bold text-indigo-700 underline">Voltar para inscrições</button>
+            <ConsultarInscricao />
           </div>
         )}
 
